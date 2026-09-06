@@ -1,0 +1,5 @@
+body { font-family: Inter, system-ui, sans-serif; color: #18352e }
+.hero { background: linear-gradient(135deg, #0d6b57, #174b45); color: white; border-radius: 24px; padding: 32px }
+.metric { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 750; line-height: 1 }
+.eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; opacity: .75 }
+.finding-card { border-left: 5px solid #e5a02b }

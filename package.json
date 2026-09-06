@@ -1,0 +1,39 @@
+{
+  "name": "poupancas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx server/db/migrate.ts",
+    "db:seed": "tsx server/db/seed.ts"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "^0.11.2",
+    "drizzle-orm": "^0.45.2",
+    "nuxt": "^3.18.1",
+    "pg": "^8.16.3",
+    "pinia": "^3.0.3",
+    "vuetify": "^3.9.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.4",
+    "eslint": "^9.35.0",
+    "eslint-plugin-vue": "^10.4.0",
+    "sass-embedded": "^1.92.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vite-plugin-vuetify": "^2.1.2",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.0.6"
+  }
+}

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "findings_open_expense_type_idx" ON "savings_findings" USING btree ("expense_id","type") WHERE "savings_findings"."status" = 'open';

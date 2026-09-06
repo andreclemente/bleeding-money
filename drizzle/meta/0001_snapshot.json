@@ -1,0 +1,1074 @@
+{
+  "id": "2bafc6e0-3ad3-442e-bd14-f86410ca9c3b",
+  "prevId": "57c9df73-8203-4334-b340-d095bc3594ee",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.bank_details": {
+      "name": "bank_details",
+      "schema": "",
+      "columns": {
+        "expense_id": {
+          "name": "expense_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_maintenance_fee_cents": {
+          "name": "account_maintenance_fee_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "card_annual_fee_cents": {
+          "name": "card_annual_fee_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transfer_fees_cents": {
+          "name": "transfer_fees_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "bank_details_expense_id_recurring_expenses_id_fk": {
+          "name": "bank_details_expense_id_recurring_expenses_id_fk",
+          "tableFrom": "bank_details",
+          "tableTo": "recurring_expenses",
+          "columnsFrom": [
+            "expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.electricity_details": {
+      "name": "electricity_details",
+      "schema": "",
+      "columns": {
+        "expense_id": {
+          "name": "expense_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "contracted_power_kva": {
+          "name": "contracted_power_kva",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tariff_type": {
+          "name": "tariff_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_per_kwh_cents": {
+          "name": "price_per_kwh_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "power_price_per_day_cents": {
+          "name": "power_price_per_day_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "annual_consumption_kwh": {
+          "name": "annual_consumption_kwh",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_historical_power_kva": {
+          "name": "max_historical_power_kva",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "electricity_details_expense_id_recurring_expenses_id_fk": {
+          "name": "electricity_details_expense_id_recurring_expenses_id_fk",
+          "tableFrom": "electricity_details",
+          "tableTo": "recurring_expenses",
+          "columnsFrom": [
+            "expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.expense_snapshots": {
+      "name": "expense_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "expense_id": {
+          "name": "expense_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_cents": {
+          "name": "price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plan": {
+          "name": "plan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "properties": {
+          "name": "properties",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "snapshots_expense_date_idx": {
+          "name": "snapshots_expense_date_idx",
+          "columns": [
+            {
+              "expression": "expense_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "observed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "expense_snapshots_expense_id_recurring_expenses_id_fk": {
+          "name": "expense_snapshots_expense_id_recurring_expenses_id_fk",
+          "tableFrom": "expense_snapshots",
+          "tableTo": "recurring_expenses",
+          "columnsFrom": [
+            "expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.market_observations": {
+      "name": "market_observations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "expense_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_type": {
+          "name": "product_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attributes": {
+          "name": "attributes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monthly_price_cents": {
+          "name": "monthly_price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "negotiated": {
+          "name": "negotiated",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "market_benchmark_idx": {
+          "name": "market_benchmark_idx",
+          "columns": [
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "product_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "country",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "observed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.market_offers": {
+      "name": "market_offers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "expense_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_name": {
+          "name": "product_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_until": {
+          "name": "valid_until",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributes": {
+          "name": "attributes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pricing": {
+          "name": "pricing",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.recurring_expenses": {
+      "name": "recurring_expenses",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "expense_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_name": {
+          "name": "product_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monthly_cost_cents": {
+          "name": "monthly_cost_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "billing_frequency": {
+          "name": "billing_frequency",
+          "type": "billing_frequency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'EUR'"
+        },
+        "contract_start_date": {
+          "name": "contract_start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contract_end_date": {
+          "name": "contract_end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commitment_end_date": {
+          "name": "commitment_end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "expenses_user_category_idx": {
+          "name": "expenses_user_category_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "recurring_expenses_user_id_users_id_fk": {
+          "name": "recurring_expenses_user_id_users_id_fk",
+          "tableFrom": "recurring_expenses",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.saving_actions": {
+      "name": "saving_actions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "finding_id": {
+          "name": "finding_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "previous_cost_cents": {
+          "name": "previous_cost_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "new_cost_cents": {
+          "name": "new_cost_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action_date": {
+          "name": "action_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "annual_saving_cents": {
+          "name": "annual_saving_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "saving_action_finding_idx": {
+          "name": "saving_action_finding_idx",
+          "columns": [
+            {
+              "expression": "finding_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "saving_actions_finding_id_savings_findings_id_fk": {
+          "name": "saving_actions_finding_id_savings_findings_id_fk",
+          "tableFrom": "saving_actions",
+          "tableTo": "savings_findings",
+          "columnsFrom": [
+            "finding_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.savings_findings": {
+      "name": "savings_findings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "expense_id": {
+          "name": "expense_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimated_monthly_saving_min_cents": {
+          "name": "estimated_monthly_saving_min_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimated_monthly_saving_max_cents": {
+          "name": "estimated_monthly_saving_max_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimated_annual_saving_min_cents": {
+          "name": "estimated_annual_saving_min_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimated_annual_saving_max_cents": {
+          "name": "estimated_annual_saving_max_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "name": "severity",
+          "type": "finding_severity",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "effort": {
+          "name": "effort",
+          "type": "finding_effort",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "urgency": {
+          "name": "urgency",
+          "type": "finding_urgency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence": {
+          "name": "evidence",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "finding_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "findings_expense_status_idx": {
+          "name": "findings_expense_status_idx",
+          "columns": [
+            {
+              "expression": "expense_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "findings_open_expense_type_idx": {
+          "name": "findings_open_expense_type_idx",
+          "columns": [
+            {
+              "expression": "expense_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"savings_findings\".\"status\" = 'open'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "savings_findings_expense_id_recurring_expenses_id_fk": {
+          "name": "savings_findings_expense_id_recurring_expenses_id_fk",
+          "tableFrom": "savings_findings",
+          "tableTo": "recurring_expenses",
+          "columnsFrom": [
+            "expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.subscription_details": {
+      "name": "subscription_details",
+      "schema": "",
+      "columns": {
+        "expense_id": {
+          "name": "expense_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "plan": {
+          "name": "plan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usage_frequency": {
+          "name": "usage_frequency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "subscription_details_expense_id_recurring_expenses_id_fk": {
+          "name": "subscription_details_expense_id_recurring_expenses_id_fk",
+          "tableFrom": "subscription_details",
+          "tableTo": "recurring_expenses",
+          "columnsFrom": [
+            "expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.telecom_details": {
+      "name": "telecom_details",
+      "schema": "",
+      "columns": {
+        "expense_id": {
+          "name": "expense_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "connection_type": {
+          "name": "connection_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "download_speed_mbps": {
+          "name": "download_speed_mbps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "upload_speed_mbps": {
+          "name": "upload_speed_mbps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mobile_data_gb": {
+          "name": "mobile_data_gb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mobile_lines": {
+          "name": "mobile_lines",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tv_included": {
+          "name": "tv_included",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "telecom_details_expense_id_recurring_expenses_id_fk": {
+          "name": "telecom_details_expense_id_recurring_expenses_id_fk",
+          "tableFrom": "telecom_details",
+          "tableTo": "recurring_expenses",
+          "columnsFrom": [
+            "expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.expense_category": {
+      "name": "expense_category",
+      "schema": "public",
+      "values": [
+        "electricity",
+        "telecom",
+        "bank",
+        "subscription",
+        "gym",
+        "insurance"
+      ]
+    },
+    "public.finding_effort": {
+      "name": "finding_effort",
+      "schema": "public",
+      "values": [
+        "very_low",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "public.billing_frequency": {
+      "name": "billing_frequency",
+      "schema": "public",
+      "values": [
+        "monthly",
+        "quarterly",
+        "annual"
+      ]
+    },
+    "public.finding_severity": {
+      "name": "finding_severity",
+      "schema": "public",
+      "values": [
+        "info",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "public.finding_status": {
+      "name": "finding_status",
+      "schema": "public",
+      "values": [
+        "open",
+        "resolved",
+        "dismissed"
+      ]
+    },
+    "public.finding_urgency": {
+      "name": "finding_urgency",
+      "schema": "public",
+      "values": [
+        "low",
+        "medium",
+        "high"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
