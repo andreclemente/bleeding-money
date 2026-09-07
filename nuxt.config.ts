@@ -5,11 +5,21 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   modules: ['@pinia/nuxt'],
   css: ['vuetify/styles', '~/assets/main.css'],
+  app: {
+    head: {
+      title: 'BleedingMoney — Auditor de despesas recorrentes',
+      htmlAttrs: { lang: 'pt-PT' },
+      meta: [
+        { name: 'description', content: 'Auditoria contínua das tuas despesas recorrentes.' },
+        { name: 'theme-color', content: '#f3f6f4' }
+      ]
+    }
+  },
   build: { transpile: ['vuetify'] },
   vite: { plugins: [vuetify({ autoImport: true })] },
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL || '',
-    public: { appName: 'Poupanças' }
+    public: { appName: 'BleedingMoney' }
   },
   typescript: { strict: true, typeCheck: true }
 })

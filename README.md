@@ -1,4 +1,4 @@
-# Poupanças
+# BleedingMoney
 
 Auditor local de despesas recorrentes que identifica desperdício e recomenda ações explicáveis.
 
