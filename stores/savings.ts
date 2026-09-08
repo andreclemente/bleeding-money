@@ -1,15 +1,15 @@
 import { defineStore } from 'pinia'
 import type { RecurringExpense, SavingsFinding } from '../domain/types'
 
-interface Dashboard { monthlyExpensesCents: number, potentialMonthlyMinCents: number, potentialMonthlyMaxCents: number, realizedAnnualCents: number, priorityFindings: SavingsFinding[], expenses: RecurringExpense[] }
+interface Dashboard { monthlyExpensesCents: number, potentialMonthlyMinCents: number, potentialMonthlyMaxCents: number, realizedAnnualCents: number, lastAnalysisAt: string | null, priorityFindings: SavingsFinding[], expenses: RecurringExpense[] }
 export const useSavingsStore = defineStore('savings', () => {
   const dashboard = ref<Dashboard | null>(null)
   const expenses = ref<RecurringExpense[]>([])
   const findings = ref<SavingsFinding[]>([])
   const loading = ref(false)
-  const refresh = async () => {
+  const refresh = async (fetcher: typeof $fetch = $fetch) => {
     loading.value = true
-    try { [dashboard.value, expenses.value, findings.value] = await Promise.all([$fetch('/api/dashboard'), $fetch('/api/expenses'), $fetch('/api/findings')]) }
+    try { [dashboard.value, expenses.value, findings.value] = await Promise.all([fetcher('/api/dashboard'), fetcher('/api/expenses'), fetcher('/api/findings')]) }
     finally { loading.value = false }
   }
   const resolve = async (id: string, newCostCents: number) => {

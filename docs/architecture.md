@@ -1,57 +1,36 @@
-# Arquitetura do MVP BleedingMoney
+# Arquitetura do BleedingMoney
 
-## Domínio
+## Decisão central
 
-`RecurringExpense` é o agregado central: representa um contrato ou serviço recorrente, não uma transação. Campos comuns ficam no agregado e detalhes de eletricidade, telecomunicações, banco e subscrição são objetos tipados separados. Categorias ainda não analisadas usam detalhes genéricos.
+O sistema é um **workspace pessoal de proprietário único**, não uma aplicação multiutilizador. A primeira criação de conta ganha a chave singleton `owner`; tentativas concorrentes perdem na fila atómica local ou na constraint única PostgreSQL. Toda a API pessoal deriva `userId` exclusivamente da sessão no evento Nitro.
 
-`ExpenseSnapshot` preserva preço, plano e propriedades observados ao longo do tempo. `SavingsEngine` recebe despesas e contexto imutável, executa analyzers registados e devolve `SavingsFinding` normalizados. Benchmark, conversão mensal/anual, score e prioridade são funções puras.
+## Autenticação
 
-`MarketObservation` pertence à inteligência de mercado anónima e nunca contém `userId`, nome, email, morada, documento ou `expenseId`. `MarketOffer` representa catálogo público. `DocumentParser` e `MarketDataProvider` são apenas interfaces; existe um provider de fixtures de ofertas, sem OCR, scraping ou integrações externas.
+- Passwords: `scrypt$v1$N$r$p$salt$hash`, salt aleatório de 128 bits e comparação `timingSafeEqual`; nenhum endpoint devolve hash ou password.
+- Sessões: token opaco aleatório de 256 bits entregue apenas em cookie `HttpOnly`, `SameSite=Lax`, `Path=/`; só SHA-256 é persistido. Login/registo rodam sessões, logout revoga e autenticação rejeita expiração/revogação.
+- Cookie `Secure`: automático por `X-Forwarded-Proto: https`, ou configurável com `AUTH_COOKIE_SECURE`.
+- CSRF: mutações exigem `Origin` exatamente igual a protocolo+host. Login tem throttle em memória, deliberadamente não distribuído, e erro genérico contra enumeração.
 
-## Schema PostgreSQL
+## Persistência e migração
 
-- `users`: identidade de desenvolvimento, preparada para autenticação
-- `recurring_expenses`: campos comuns e montantes em integer minor units com moeda explícita
-- `electricity_details`, `telecom_details`, `bank_details`, `subscription_details`: tabelas 1:1 tipadas, com FK única para a despesa
-- `expense_snapshots`: histórico append-only de preço, plano, propriedades e fonte
-- `market_observations`: amostras anónimas sem FK para utilizadores ou despesas
-- `market_offers`: ofertas públicas, atributos e pricing em `jsonb`
-- `savings_findings`: resultados explicáveis, evidência em `jsonb`, estado resolvido/dispensado
-- `saving_actions`: custo anterior/novo e poupança anual realizada
+O agregado `RecurringExpense` mantém os campos comuns; detalhes de eletricidade, telecom, banca e subscrição são tipados. `ExpenseSnapshot` é histórico append-only. Findings e ações ligam-se à despesa e herdam isolamento pelo proprietário. `MarketObservation` é inteligência de mercado anónima, sem identidade pessoal.
 
-Datas civis usam `date`; auditoria usa `timestamp with time zone`. UUIDs são gerados pela aplicação. Índices cobrem utilizador/categoria, histórico, filtros de benchmark e findings ativos.
+Sem `DATABASE_URL`, `JsonFileRepository` grava estado v2 (`owner`, `sessions`, despesas, snapshots, findings, ações e observações anónimas). Aceita v1 e migra na próxima escrita. Cada operação relê o ficheiro dentro de uma fila partilhada por caminho e grava temporário+rename; toda a estrutura e relações são validadas antes de uso. Conta, primeira sessão e reivindicação legada são uma única mutação, logo um crash não deixa a conta sem dados reclamáveis. Login e autenticação repetem a reivindicação idempotente se o marcador faltar.
 
-## Estrutura
+Com PostgreSQL, o schema Drizzle acrescenta `password_hash`, `owner_key`, `legacy_claimed_at` e `auth_sessions`. O registo usa uma transação Drizzle: cria o proprietário, atualiza apenas `recurring_expenses.user_id` do UUID legado e cria a sessão. As tabelas ligadas não são reescritas. A constraint única de `owner_key` arbitra concorrência. Observações de mercado não são tocadas.
 
-- `domain/`: entidades, tipos, funções puras, engine, analyzers e ports
-- `server/db/`: schema Drizzle, cliente, repositório e seed
-- `server/api/`: adaptadores HTTP Nitro
-- `stores/`: estado Pinia e API
-- `pages/`, `components/`, `layouts/`, `plugins/`: UI Nuxt/Vuetify
-- `tests/domain/`: especificação unitária crítica
-- `drizzle/`: migrations SQL
+## Fronteiras HTTP e UI
 
-## Decisões
+Middleware Nitro autentica o hash do cookie e coloca apenas o utilizador público em `event.context.auth`. Handlers protegidos chamam `getAuthenticatedUserId`; não leem IDs do corpo. `PUBLIC_ORIGIN` fixa a origem CSRF canónica. Cabeçalhos de proxy só participam no protocolo, host e IP do throttle com `TRUST_PROXY=true`; a predefinição usa exclusivamente ligação, host e IP diretos. Públicos: disponibilidade de registo, sessão, login, registo, logout e página metodológica. `GET /api/setup` autenticado responde apenas `{ onboardingNeeded, storageMode }`.
 
-Foi escolhido **Drizzle** em vez de Prisma porque mantém o schema próximo de SQL/PostgreSQL, produz migrations transparentes e tipadas, tem runtime pequeno e não exige cliente binário. O domínio não importa Drizzle.
+Middleware de rota envia uma instalação sem proprietário para `/register`, visitantes posteriores para `/login`, e um proprietário sem despesas para `/welcome`. O dashboard segue o arquétipo Monitor: contexto compacto, intervalo potencial principal, realizado secundário e lista de ações. O wizard segue Configure: seis exemplos mapeados para os quatro DTOs reais, perguntas condicionais e divulgação dos checks disponíveis/indisponíveis. `/how-it-works` segue Decide/Learn e documenta as seis regras implementadas. A análise ocorre apenas ao criar/atualizar dados.
 
-O MVP usa um utilizador de desenvolvimento substituível por um `DevUserContext`; todos os acessos são filtrados por esse utilizador. Com `DATABASE_URL`, a API usa PostgreSQL. Sem configuração, usa `JsonFileRepository`: começa sem dados pessoais e persiste o estado em `.data/bleedingmoney.json` (ou `LOCAL_DATA_FILE`). Cada mutação é serializada no processo e gravada num ficheiro temporário que é renomeado atomicamente; JSON ausente cria estado vazio, mas JSON corrupto falha de forma explícita e nunca é substituído. `BLEEDINGMONEY_DEMO=true` ativa as fixtures pessoais apenas na criação de um armazenamento local ainda inexistente. A seed PostgreSQL continua a conter os mesmos dados canónicos para demonstrações controladas. A resolução usa uma transação que valida a transição `open → resolved`, cria uma `SavingAction` imutável, atualiza o custo atual e acrescenta um snapshot.
+## Regras implementadas
 
-## Onboarding e fronteira de privacidade
+- Subscrição: última utilização há 60 dias ou mais.
+- Aumento: pelo menos 10% e 2 € desde o primeiro snapshot; na criação existe apenas um snapshot, pelo que a monitorização começa indisponível até uma observação posterior.
+- Telecom: fidelização terminada com base apenas na data de fim (início opcional); benchmark acima de p75 com 10 casos PT comparáveis dos últimos 12 meses.
+- Banco: comissão de manutenção positiva, estimativa de 80–100%.
+- Eletricidade: potência contratada pelo menos 1 kVA acima do máximo e primeiro escalão padrão viável entre 1,15; 2,3; 3,45; 4,6; 5,75; 6,9; 10,35; 13,8; 17,25; 20,7; 27,6; 34,5 e 41,4 kVA. Se nenhum escalão cobrir o máximo histórico, não é criado finding.
 
-`GET /api/setup` consulta apenas a existência de despesas do utilizador atual e responde com `{ onboardingNeeded, storageMode }`. O endpoint não devolve identificadores, montantes, fornecedores ou outros dados pessoais. `/` e `/dashboard` encaminham instalações vazias para `/welcome`; o mesmo `ExpenseWizard` guiado serve o onboarding e `/expenses/new`, e cria a despesa através de `POST /api/expenses`. Ele recolhe informação por etapas e envia `contractStartDate` e `commitmentEndDate` para categorias com fidelização, sem guardar uma coluna de duração derivada.
-
-Benchmarks exigem 10 observações comparáveis, filtradas por categoria, fornecedor, tipo, atributos relevantes, país e 12 meses. Percentis usam interpolação linear. Findings seed demonstram a análise inicial; novas despesas são analisadas pelo serviço.
-
-## Ambiguidades e defaults
-
-- Frequências mensal, trimestral e anual são normalizadas para custo mensal
-- Aumento dispara a partir de 10% e pelo menos 2 €/mês
-- Subscrição sem uso há 60 dias; sem `lastUsedAt` não há conclusão
-- Fidelização telecom terminada gera finding
-- Manutenção bancária positiva é evitável; estimativa 80–100% da comissão
-- Potência excessiva exige margem de 1,0 kVA sobre o máximo
-- Score começa em 100 e desconta severidade ponderada pela confiança
-- Prioridade combina poupança anual (45%), confiança (25%), baixo esforço (15%) e urgência (15%)
-- Categorias sem analyzer ficam visíveis e não recebem recomendações inventadas
-- Poupança realizada é `max(0, custo anterior - custo novo) × 12`
+Um estado saudável sem finding é válido; falta de dados opcionais é apresentada como check indisponível.

@@ -1,4 +1,4 @@
+import { getAuthenticatedUserId } from '../../auth/context'
 import { getRepository } from '../../db/repository'
-import { devUserContext } from '../../services/user-context'
 
-export default defineEventHandler(() => getRepository().listFindings(devUserContext().userId))
+export default defineEventHandler(event => getRepository().listFindings(getAuthenticatedUserId(event)))

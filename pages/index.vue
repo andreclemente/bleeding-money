@@ -1,5 +1,6 @@
 <script setup lang="ts">
-const setup = await $fetch<{ onboardingNeeded: boolean }>('/api/setup')
+const requestFetch = useRequestFetch()
+const setup = await requestFetch<{ onboardingNeeded: boolean }>('/api/setup')
 await navigateTo(setup.onboardingNeeded ? '/welcome' : '/dashboard')
 </script>
 

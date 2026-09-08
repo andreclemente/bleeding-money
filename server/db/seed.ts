@@ -1,3 +1,4 @@
+import { eq, sql } from 'drizzle-orm'
 import { createDb } from './client'
 import { bankDetails, electricityDetails, expenseSnapshots, marketObservations, marketOffers, recurringExpenses, savingsFindings, subscriptionDetails, telecomDetails, users } from './schema'
 import { DEMO_USER_ID, demoExpenses, demoFindings, demoMarketObservations, demoMarketOffers, demoSnapshots } from './demo-data'
@@ -6,6 +7,9 @@ const url = process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL é obrigatória')
 const db = createDb(url)
 await db.transaction(async tx => {
+  await tx.execute(sql`lock table users in share row exclusive mode`)
+  const owner = (await tx.select({ id: users.id }).from(users).where(eq(users.ownerKey, 'owner')).limit(1))[0]
+  if (owner) throw new Error('Seed de demonstração recusada: a base de dados já tem proprietário.')
   await tx.insert(users).values({ id: DEMO_USER_ID, name: 'Utilizador Demo', email: 'demo@local.invalid' }).onConflictDoNothing()
   for (const item of demoExpenses) {
     const { details, createdAt, updatedAt, ...common } = item

@@ -74,6 +74,8 @@ describe('seis analyzers', () => {
     const analyzer = new ElectricityContractedPowerAnalyzer()
     expect((await analyzer.analyze(base({ category: 'electricity', details: { kind: 'electricity', contractedPowerKva: 6.9, tariffType: 'simple', pricePerKwhCents: 16, powerPricePerDayCents: 50, annualConsumptionKwh: 3200, maxHistoricalPowerKva: 3.8 } }), context()))[0]).toMatchObject({ type: 'WRONG_PLAN', estimatedMonthlySavingMinCents: 400, estimatedMonthlySavingMaxCents: 600 })
     expect(await analyzer.analyze(base({ category: 'electricity', details: { kind: 'electricity', contractedPowerKva: 4.6, tariffType: 'simple', pricePerKwhCents: 16, powerPricePerDayCents: 40, annualConsumptionKwh: 2500, maxHistoricalPowerKva: 4.1 } }), context())).toHaveLength(0)
+    expect((await analyzer.analyze(base({ category: 'electricity', details: { kind: 'electricity', contractedPowerKva: 20.7, tariffType: 'simple', pricePerKwhCents: 16, powerPricePerDayCents: 80, annualConsumptionKwh: 9000, maxHistoricalPowerKva: 11 } }), context()))[0]?.action).toContain('13,8 kVA')
+    expect(await analyzer.analyze(base({ category: 'electricity', details: { kind: 'electricity', contractedPowerKva: 55, tariffType: 'simple', pricePerKwhCents: 16, powerPricePerDayCents: 120, annualConsumptionKwh: 12000, maxHistoricalPowerKva: 42 } }), context())).toHaveLength(0)
   })
 })
 

@@ -1,8 +1,13 @@
 import pg from 'pg'
+import { and, eq, isNull } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import { annualSaving } from '../../domain/savings'
 import type { ExpenseDetails, ExpenseSnapshot, MarketObservation, RecurringExpense, SavingAction, SavingsFinding } from '../../domain/types'
+import type { StoredOwner, StoredSession } from '../auth/types'
+import { parsePasswordHash } from '../auth/crypto'
 import { createSavingsEngine } from '../services/savings-engine'
 import { isIsoDate, parseExpenseCreateInput, parseExpensePatchInput, validateCommitmentDates, type ExpenseInput, type ExpensePatchInput, type PoupancasRepository } from './repository'
+import { recurringExpenses, sessions, users } from './schema'
 
 type Queryable = Pick<pg.Pool, 'query'> | Pick<pg.PoolClient, 'query'>
 const dateFrom = (value: unknown): string | undefined => {
@@ -29,8 +34,50 @@ const findingValues = (finding: SavingsFinding) => [finding.title, finding.descr
 
 export class PostgresRepository implements PoupancasRepository {
   private pool: pg.Pool
+  private db: ReturnType<typeof drizzle>
   private engine = createSavingsEngine()
-  constructor(url: string) { this.pool = new pg.Pool({ connectionString: url }) }
+  constructor(url: string) { this.pool = new pg.Pool({ connectionString: url }); this.db = drizzle(this.pool) }
+
+  async getOwner(): Promise<StoredOwner | null> {
+    const row = (await this.db.select().from(users).where(eq(users.ownerKey, 'owner')).limit(1))[0]
+    if (!row?.passwordHash) return null
+    if (!parsePasswordHash(row.passwordHash)) throw new Error('Dados de autenticação do proprietário inválidos.')
+    return { id: row.id, name: row.name, email: row.email, passwordHash: row.passwordHash, createdAt: row.createdAt.toISOString(), legacyClaimedAt: row.legacyClaimedAt?.toISOString() }
+  }
+  async registerOwner(owner: StoredOwner, session: StoredSession, legacyUserId: string) {
+    try {
+      await this.db.transaction(async tx => {
+        await tx.insert(users).values({ id: owner.id, name: owner.name, email: owner.email, passwordHash: owner.passwordHash, ownerKey: 'owner', createdAt: new Date(owner.createdAt), legacyClaimedAt: new Date(owner.createdAt) })
+        await tx.update(recurringExpenses).set({ userId: owner.id }).where(eq(recurringExpenses.userId, legacyUserId))
+        await tx.insert(sessions).values({ id: session.id, userId: session.userId, tokenHash: session.tokenHash, createdAt: new Date(session.createdAt), expiresAt: new Date(session.expiresAt) })
+      })
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') throw new Error('Esta área pessoal já tem proprietário.')
+      throw error
+    }
+  }
+  async replaceSessions(session: StoredSession) {
+    await this.db.transaction(async tx => {
+      await tx.update(sessions).set({ revokedAt: new Date(session.createdAt) }).where(and(eq(sessions.userId, session.userId), isNull(sessions.revokedAt)))
+      await tx.insert(sessions).values({ id: session.id, userId: session.userId, tokenHash: session.tokenHash, createdAt: new Date(session.createdAt), expiresAt: new Date(session.expiresAt) })
+    })
+  }
+  async getSession(tokenHash: string) {
+    const rows = await this.db.select({ session: sessions, owner: users }).from(sessions).innerJoin(users, eq(sessions.userId, users.id)).where(and(eq(sessions.tokenHash, tokenHash), eq(users.ownerKey, 'owner'))).limit(1)
+    const row = rows[0]
+    if (!row || !row.owner.passwordHash) return null
+    return {
+      owner: { id: row.owner.id, name: row.owner.name, email: row.owner.email, passwordHash: row.owner.passwordHash, createdAt: row.owner.createdAt.toISOString(), legacyClaimedAt: row.owner.legacyClaimedAt?.toISOString() },
+      session: { id: row.session.id, userId: row.session.userId, tokenHash: row.session.tokenHash, createdAt: row.session.createdAt.toISOString(), expiresAt: row.session.expiresAt.toISOString(), revokedAt: row.session.revokedAt?.toISOString() }
+    }
+  }
+  async revokeSession(tokenHash: string, revokedAt: string) { await this.db.update(sessions).set({ revokedAt: new Date(revokedAt) }).where(and(eq(sessions.tokenHash, tokenHash), isNull(sessions.revokedAt))) }
+  async claimLegacyExpenses(ownerId: string, legacyUserId: string, claimedAt: string) {
+    await this.db.transaction(async tx => {
+      await tx.update(recurringExpenses).set({ userId: ownerId }).where(eq(recurringExpenses.userId, legacyUserId))
+      await tx.update(users).set({ legacyClaimedAt: new Date(claimedAt) }).where(and(eq(users.id, ownerId), eq(users.ownerKey, 'owner')))
+    })
+  }
 
   private async listExpensesWith(db: Queryable, userId: string) { return (await db.query(`${expenseSql} where e.user_id=$1 order by e.created_at`, [userId])).rows.map(expenseFrom) }
   private async getExpenseWith(db: Queryable, userId: string, id: string) {

@@ -10,7 +10,7 @@ export default defineNuxtConfig({
       title: 'BleedingMoney — Auditor de despesas recorrentes',
       htmlAttrs: { lang: 'pt-PT' },
       meta: [
-        { name: 'description', content: 'Auditoria contínua das tuas despesas recorrentes.' },
+        { name: 'description', content: 'Análise explicável das tuas despesas recorrentes.' },
         { name: 'theme-color', content: '#f3f6f4' }
       ]
     }

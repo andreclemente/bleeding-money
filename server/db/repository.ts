@@ -2,6 +2,8 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { annualSaving } from '../../domain/savings'
 import type { ExpenseDetails, ExpenseSnapshot, MarketObservation, RecurringExpense, SavingAction, SavingsFinding } from '../../domain/types'
+import { parsePasswordHash } from '../auth/crypto'
+import type { AuthRepository, StoredOwner, StoredSession } from '../auth/types'
 import { createSavingsEngine } from '../services/savings-engine'
 import { PostgresRepository } from './postgres-repository'
 import { demoActions, demoExpenses, demoFindings, demoMarketObservations, demoSnapshots } from './demo-data'
@@ -123,7 +125,7 @@ export const parseExpensePatchInput = (value: unknown): ExpensePatchInput => {
   return result
 }
 
-export interface PoupancasRepository {
+export interface PoupancasRepository extends AuthRepository {
   listExpenses(userId: string): Promise<RecurringExpense[]>
   getExpense(userId: string, id: string): Promise<{ expense: RecurringExpense, snapshots: ExpenseSnapshot[], findings: SavingsFinding[] } | null>
   createExpense(userId: string, input: ExpenseInput): Promise<RecurringExpense>
@@ -139,21 +141,27 @@ const snapshotProperties = (expense: RecurringExpense) => ({ provider: expense.p
 const relevantState = (expense: RecurringExpense) => JSON.stringify({ provider: expense.provider, productName: expense.productName, monthlyCostCents: expense.monthlyCostCents, currency: expense.currency, contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate, details: expense.details })
 
 export interface RepositoryState {
-  version: 1
+  version: 2
   expenses: RecurringExpense[]
   snapshots: ExpenseSnapshot[]
   findings: SavingsFinding[]
   actions: SavingAction[]
+  marketObservations: MarketObservation[]
+  owner: StoredOwner | null
+  sessions: StoredSession[]
 }
 
 interface MemoryRepositoryOptions { demo?: boolean, state?: RepositoryState }
 
 const initialState = (demo = false): RepositoryState => ({
-  version: 1,
+  version: 2,
   expenses: structuredClone(demo ? demoExpenses : []),
   snapshots: structuredClone(demo ? demoSnapshots : []),
   findings: structuredClone(demo ? demoFindings : []),
-  actions: structuredClone(demo ? demoActions : [])
+  actions: structuredClone(demo ? demoActions : []),
+  marketObservations: structuredClone(demoMarketObservations),
+  owner: null,
+  sessions: []
 })
 
 const expenseCategories = ['electricity', 'telecom', 'bank', 'subscription', 'gym', 'insurance'] as const
@@ -299,18 +307,70 @@ const parseStoredAction = (value: unknown): SavingAction => {
   return row as unknown as SavingAction
 }
 
+const parseStoredObservation = (value: unknown): MarketObservation => {
+  const row = storedObject(value)
+  rejectUnknown(row, ['id', 'category', 'provider', 'productType', 'attributes', 'monthlyPriceCents', 'negotiated', 'country', 'observedAt', 'source', 'confidence'])
+  storedUuid(row.id)
+  storedEnum(row.category, expenseCategories)
+  storedText(row.provider)
+  storedText(row.productType)
+  const attributes = storedObject(row.attributes)
+  assertStored(Object.values(attributes).every(item => ['string', 'number', 'boolean'].includes(typeof item) && (typeof item !== 'number' || Number.isFinite(item))))
+  storedMoney(row.monthlyPriceCents)
+  assertStored(typeof row.negotiated === 'boolean')
+  storedText(row.country)
+  storedDate(row.observedAt)
+  storedText(row.source)
+  storedFinite(row.confidence, 0, 1)
+  return row as unknown as MarketObservation
+}
+
+const parseStoredOwner = (value: unknown): StoredOwner | null => {
+  if (value === null || value === undefined) return null
+  const row = storedObject(value)
+  rejectUnknown(row, ['id', 'name', 'email', 'passwordHash', 'createdAt', 'legacyClaimedAt'])
+  storedUuid(row.id)
+  storedText(row.name)
+  assertStored((row.name as string).length <= 100)
+  assertStored(typeof row.email === 'string' && row.email === row.email.toLowerCase() && row.email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email))
+  assertStored(typeof row.passwordHash === 'string')
+  assertStored(Boolean(parsePasswordHash(row.passwordHash as string)))
+  storedTimestamp(row.createdAt)
+  storedOptionalTimestamp(row.legacyClaimedAt)
+  return row as unknown as StoredOwner
+}
+
+const parseStoredSession = (value: unknown): StoredSession => {
+  const row = storedObject(value)
+  rejectUnknown(row, ['id', 'userId', 'tokenHash', 'createdAt', 'expiresAt', 'revokedAt'])
+  storedUuid(row.id)
+  storedUuid(row.userId)
+  assertStored(typeof row.tokenHash === 'string' && /^[a-f0-9]{64}$/.test(row.tokenHash))
+  storedTimestamp(row.createdAt)
+  storedTimestamp(row.expiresAt)
+  const revokedAt = storedOptionalTimestamp(row.revokedAt)
+  assertStored(Date.parse(row.expiresAt as string) > Date.parse(row.createdAt as string))
+  assertStored(!revokedAt || Date.parse(revokedAt) >= Date.parse(row.createdAt as string))
+  return row as unknown as StoredSession
+}
+
 const uniqueIds = (items: Array<{ id: string }>) => new Set(items.map(item => item.id)).size === items.length
 
 const parseRepositoryState = (value: unknown): RepositoryState => {
   try {
     const row = storedObject(value)
-    rejectUnknown(row, ['version', 'expenses', 'snapshots', 'findings', 'actions'])
-    assertStored(row.version === 1 && Array.isArray(row.expenses) && Array.isArray(row.snapshots) && Array.isArray(row.findings) && Array.isArray(row.actions))
+    const version = row.version
+    rejectUnknown(row, version === 1 ? ['version', 'expenses', 'snapshots', 'findings', 'actions'] : ['version', 'expenses', 'snapshots', 'findings', 'actions', 'marketObservations', 'owner', 'sessions'])
+    assertStored((version === 1 || version === 2) && Array.isArray(row.expenses) && Array.isArray(row.snapshots) && Array.isArray(row.findings) && Array.isArray(row.actions))
+    if (version === 2) assertStored(Array.isArray(row.marketObservations) && Array.isArray(row.sessions))
     const expenses = row.expenses.map(parseStoredExpense)
     const snapshots = row.snapshots.map(parseStoredSnapshot)
     const findings = row.findings.map(parseStoredFinding)
     const actions = row.actions.map(parseStoredAction)
-    assertStored(uniqueIds(expenses) && uniqueIds(snapshots) && uniqueIds(findings) && uniqueIds(actions))
+    const marketObservations = version === 1 ? structuredClone(demoMarketObservations) : (row.marketObservations as unknown[]).map(parseStoredObservation)
+    const owner = version === 1 ? null : parseStoredOwner(row.owner)
+    const sessions = version === 1 ? [] : (row.sessions as unknown[]).map(parseStoredSession)
+    assertStored(uniqueIds(expenses) && uniqueIds(snapshots) && uniqueIds(findings) && uniqueIds(actions) && uniqueIds(marketObservations) && uniqueIds(sessions))
     const expenseIds = new Set(expenses.map(item => item.id))
     const findingsById = new Map(findings.map(item => [item.id, item]))
     const actionIds = new Set(actions.map(item => item.id))
@@ -319,11 +379,12 @@ const parseRepositoryState = (value: unknown): RepositoryState => {
     assertStored(actions.every(item => findingsById.get(item.findingId)?.status === 'resolved'))
     assertStored(new Set(actions.map(item => item.findingId)).size === actions.length)
     assertStored(new Set(findings.filter(item => item.status === 'open').map(item => `${item.expenseId}:${item.type}`)).size === findings.filter(item => item.status === 'open').length)
+    assertStored(sessions.every(item => owner && item.userId === owner.id))
     for (const snapshot of snapshots) {
       const savingActionId = snapshot.properties.savingActionId
       if (savingActionId !== undefined) assertStored(typeof savingActionId === 'string' && actionIds.has(savingActionId))
     }
-    return structuredClone({ version: 1, expenses, snapshots, findings, actions })
+    return structuredClone({ version: 2, expenses, snapshots, findings, actions, marketObservations, owner, sessions })
   } catch {
     throw new Error('Ficheiro de dados local corrupto')
   }
@@ -334,7 +395,9 @@ export class MemoryRepository implements PoupancasRepository {
   private snapshots: ExpenseSnapshot[]
   private findings: SavingsFinding[]
   private actions: SavingAction[]
-  private observations: MarketObservation[] = structuredClone(demoMarketObservations)
+  private observations: MarketObservation[]
+  private owner: StoredOwner | null
+  private sessions: StoredSession[]
   private engine = createSavingsEngine()
 
   constructor(options: MemoryRepositoryOptions = {}) {
@@ -343,10 +406,40 @@ export class MemoryRepository implements PoupancasRepository {
     this.snapshots = structuredClone(state.snapshots)
     this.findings = structuredClone(state.findings)
     this.actions = structuredClone(state.actions)
+    this.observations = structuredClone(state.marketObservations)
+    this.owner = structuredClone(state.owner)
+    this.sessions = structuredClone(state.sessions)
   }
 
   exportState(): RepositoryState {
-    return structuredClone({ version: 1, expenses: this.expenses, snapshots: this.snapshots, findings: this.findings, actions: this.actions })
+    return structuredClone({ version: 2, expenses: this.expenses, snapshots: this.snapshots, findings: this.findings, actions: this.actions, marketObservations: this.observations, owner: this.owner, sessions: this.sessions })
+  }
+
+  async getOwner() { return structuredClone(this.owner) }
+  async registerOwner(owner: StoredOwner, session: StoredSession, legacyUserId: string) {
+    if (this.owner) throw new Error('Esta área pessoal já tem proprietário.')
+    this.owner = structuredClone({ ...owner, legacyClaimedAt: owner.createdAt })
+    this.sessions = [structuredClone(session)]
+    for (const expense of this.expenses) if (expense.userId === legacyUserId) expense.userId = owner.id
+  }
+  async replaceSessions(session: StoredSession) {
+    if (!this.owner || session.userId !== this.owner.id) throw new Error('Conta não encontrada.')
+    const now = session.createdAt
+    this.sessions.forEach(item => { if (!item.revokedAt) item.revokedAt = now })
+    this.sessions.push(structuredClone(session))
+  }
+  async getSession(tokenHash: string) {
+    const session = this.sessions.find(item => item.tokenHash === tokenHash)
+    return session && this.owner && session.userId === this.owner.id ? structuredClone({ owner: this.owner, session }) : null
+  }
+  async revokeSession(tokenHash: string, revokedAt: string) {
+    const session = this.sessions.find(item => item.tokenHash === tokenHash)
+    if (session && !session.revokedAt) session.revokedAt = revokedAt
+  }
+  async claimLegacyExpenses(ownerId: string, legacyUserId: string, claimedAt: string) {
+    if (!this.owner || this.owner.id !== ownerId) throw new Error('Conta não encontrada.')
+    for (const expense of this.expenses) if (expense.userId === legacyUserId) expense.userId = ownerId
+    this.owner.legacyClaimedAt = claimedAt
   }
 
   async listExpenses(userId: string) { return structuredClone(this.expenses.filter(item => item.userId === userId)) }
@@ -497,6 +590,12 @@ export class JsonFileRepository implements PoupancasRepository {
   }
 
   listExpenses(userId: string) { return this.read(() => this.repository.listExpenses(userId)) }
+  getOwner() { return this.read(() => this.repository.getOwner()) }
+  registerOwner(owner: StoredOwner, session: StoredSession, legacyUserId: string) { return this.mutate(() => this.repository.registerOwner(owner, session, legacyUserId)) }
+  replaceSessions(session: StoredSession) { return this.mutate(() => this.repository.replaceSessions(session)) }
+  getSession(tokenHash: string) { return this.read(() => this.repository.getSession(tokenHash)) }
+  revokeSession(tokenHash: string, revokedAt: string) { return this.mutate(() => this.repository.revokeSession(tokenHash, revokedAt)) }
+  claimLegacyExpenses(ownerId: string, legacyUserId: string, claimedAt: string) { return this.mutate(() => this.repository.claimLegacyExpenses(ownerId, legacyUserId, claimedAt)) }
   getExpense(userId: string, id: string) { return this.read(() => this.repository.getExpense(userId, id)) }
   createExpense(userId: string, input: ExpenseInput) { return this.mutate(() => this.repository.createExpense(userId, input)) }
   updateExpense(userId: string, id: string, input: ExpensePatchInput) { return this.mutate(() => this.repository.updateExpense(userId, id, input)) }

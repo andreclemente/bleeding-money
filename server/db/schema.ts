@@ -9,8 +9,11 @@ export const effortEnum = pgEnum('finding_effort', ['very_low', 'low', 'medium',
 export const urgencyEnum = pgEnum('finding_urgency', ['low', 'medium', 'high'])
 
 export const users = pgTable('users', {
-  id: uuid('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull().unique(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  id: uuid('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull().unique(), passwordHash: text('password_hash'), ownerKey: text('owner_key').unique(), legacyClaimedAt: timestamp('legacy_claimed_at', { withTimezone: true }), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 })
+export const sessions = pgTable('auth_sessions', {
+  id: uuid('id').primaryKey(), userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), tokenHash: text('token_hash').notNull().unique(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(), revokedAt: timestamp('revoked_at', { withTimezone: true })
+}, table => [index('auth_sessions_user_expiry_idx').on(table.userId, table.expiresAt)])
 export const recurringExpenses = pgTable('recurring_expenses', {
   id: uuid('id').primaryKey(), userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), category: categoryEnum('category').notNull(), provider: text('provider').notNull(), productName: text('product_name').notNull(), monthlyCostCents: integer('monthly_cost_cents').notNull(), billingFrequency: frequencyEnum('billing_frequency').notNull(), currency: text('currency').notNull().default('EUR'), contractStartDate: date('contract_start_date'), contractEndDate: date('contract_end_date'), commitmentEndDate: date('commitment_end_date'), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 }, table => [index('expenses_user_category_idx').on(table.userId, table.category)])

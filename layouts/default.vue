@@ -1,3 +1,16 @@
+<script setup lang="ts">
+const requestFetch = useRequestFetch()
+const { user } = await requestFetch<{ user: { name: string, email: string } | null }>('/api/auth/session')
+const leaving = ref(false)
+const logout = async () => {
+  leaving.value = true
+  try {
+    await requestFetch('/api/auth/logout', { method: 'POST' })
+    await navigateTo('/login')
+  } finally { leaving.value = false }
+}
+</script>
+
 <template>
   <div class="app-shell">
     <aside
@@ -7,17 +20,18 @@
       <NuxtLink
         class="brand"
         to="/dashboard"
-        aria-label="BleedingMoney — resumo"
+        aria-label="BleedingMoney — monitor"
       >
         <span
           class="brand-mark"
           aria-hidden="true"
-        >BM</span>
-        <span>BleedingMoney</span>
+        >BM</span><span>BleedingMoney</span>
       </NuxtLink>
-
+      <p class="workspace-label">
+        Espaço pessoal privado
+      </p>
       <div class="nav-label">
-        Auditoria
+        Monitorização
       </div>
       <nav class="app-nav">
         <NuxtLink
@@ -25,59 +39,71 @@
           to="/dashboard"
         >
           <span
-            class="nav-icon"
+            class="nav-index"
             aria-hidden="true"
-          >⌁</span>
-          <span>Resumo</span>
+          >01</span><span>Monitor</span>
         </NuxtLink>
         <NuxtLink
           class="nav-link"
           to="/expenses"
         >
           <span
-            class="nav-icon"
+            class="nav-index"
             aria-hidden="true"
-          >▤</span>
-          <span>Despesas</span>
+          >02</span><span>Despesas</span>
         </NuxtLink>
         <NuxtLink
           class="nav-link"
           to="/findings"
         >
           <span
-            class="nav-icon"
+            class="nav-index"
             aria-hidden="true"
-          >◇</span>
-          <span>Recomendações</span>
+          >03</span><span>Recomendações</span>
+        </NuxtLink>
+        <NuxtLink
+          class="nav-link"
+          to="/how-it-works"
+        >
+          <span
+            class="nav-index"
+            aria-hidden="true"
+          >04</span><span>Como funciona</span>
         </NuxtLink>
       </nav>
-
-      <div class="sidebar-status">
-        <div class="status-live">
-          <span
-            class="status-dot"
-            aria-hidden="true"
-          />
-          Auditoria ativa
-        </div>
-        <p>As despesas recorrentes são analisadas continuamente.</p>
+      <div
+        v-if="user"
+        class="account-control"
+      >
+        <strong>{{ user.name }}</strong><span>{{ user.email }}</span>
+        <button
+          type="button"
+          :disabled="leaving"
+          @click="logout"
+        >
+          {{ leaving ? 'A sair…' : 'Terminar sessão' }}
+        </button>
       </div>
     </aside>
-
     <main class="app-main">
       <header class="mobile-topbar">
         <NuxtLink
           class="brand"
           to="/dashboard"
-          aria-label="BleedingMoney — resumo"
         >
           <span
             class="brand-mark"
             aria-hidden="true"
-          >BM</span>
-          <span>BleedingMoney</span>
+          >BM</span><span>BleedingMoney</span>
         </NuxtLink>
-        <span class="mobile-topbar-status">Auditoria ativa</span>
+        <button
+          class="mobile-logout"
+          type="button"
+          :disabled="leaving"
+          @click="logout"
+        >
+          Sair
+        </button>
       </header>
       <div class="page-container">
         <slot />

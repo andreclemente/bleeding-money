@@ -15,6 +15,13 @@
       "when": 1788710225969,
       "tag": "0001_wet_nemesis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788861134574,
+      "tag": "0002_hard_giant_man",
+      "breakpoints": true
     }
   ]
 }

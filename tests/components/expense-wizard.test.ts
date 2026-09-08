@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { buildExpenseRequest, type ExpenseWizardState } from '../../utils/expense-wizard'
 import { parseExpenseCreateInput, parseExpensePatchInput } from '../../server/db/repository'
@@ -53,6 +54,19 @@ describe('pedido do assistente de despesas', () => {
 })
 
 describe('validação das datas de fidelização', () => {
+  it('aceita o fim da fidelização sem data de início', () => {
+    const request = buildExpenseRequest(base({ category: 'telecom', contractStartDate: '', commitmentEndDate: '2026-12-31' }))
+    expect(() => parseExpenseCreateInput(request)).not.toThrow()
+    expect(request).not.toHaveProperty('contractStartDate')
+  })
+
+  it('apresenta o início como opcional e só o compara quando ambas as datas existem', async () => {
+    const component = await readFile(new URL('../../components/ExpenseWizard.vue', import.meta.url), 'utf8')
+    expect(component).toContain('label="Início do contrato · opcional"')
+    expect(component).toMatch(/form\.contractStartDate\s*&&\s*form\.commitmentEndDate\s*&&\s*form\.commitmentEndDate\s*<\s*form\.contractStartDate/)
+    expect(component).not.toContain('Indica o início do contrato e o fim da fidelização.')
+  })
+
   it('rejeita fim anterior ao início na criação', () => {
     expect(() => parseExpenseCreateInput(buildExpenseRequest(base({ contractStartDate: '2026-08-01', commitmentEndDate: '2026-07-31' })))).toThrow(/fidelização/i)
   })
