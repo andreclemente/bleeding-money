@@ -2,7 +2,7 @@ import pg from 'pg'
 import { annualSaving } from '../../domain/savings'
 import type { ExpenseDetails, ExpenseSnapshot, MarketObservation, RecurringExpense, SavingAction, SavingsFinding } from '../../domain/types'
 import { createSavingsEngine } from '../services/savings-engine'
-import { isIsoDate, parseExpenseCreateInput, parseExpensePatchInput, type ExpenseInput, type ExpensePatchInput, type PoupancasRepository } from './repository'
+import { isIsoDate, parseExpenseCreateInput, parseExpensePatchInput, validateCommitmentDates, type ExpenseInput, type ExpensePatchInput, type PoupancasRepository } from './repository'
 
 type Queryable = Pick<pg.Pool, 'query'> | Pick<pg.PoolClient, 'query'>
 const dateFrom = (value: unknown): string | undefined => {
@@ -94,6 +94,7 @@ export class PostgresRepository implements PoupancasRepository {
       if (!current) { await client.query('rollback'); return null }
       if (input.details && input.details.kind !== current.expense.category) throw new Error('Detalhes incompatíveis com a categoria')
       const merged = { ...current.expense, ...input, updatedAt: new Date().toISOString() }
+      validateCommitmentDates(merged.contractStartDate, merged.commitmentEndDate)
       if (relevantState(merged) === relevantState(current.expense)) { await client.query('commit'); return current.expense }
       await client.query('update recurring_expenses set provider=$3,product_name=$4,monthly_cost_cents=$5,currency=$6,contract_start_date=$7,contract_end_date=$8,commitment_end_date=$9,updated_at=now() where id=$1 and user_id=$2', [id, userId, merged.provider, merged.productName, merged.monthlyCostCents, merged.currency, merged.contractStartDate, merged.contractEndDate, merged.commitmentEndDate])
       if (input.details) await this.writeDetails(client, id, input.details, true)

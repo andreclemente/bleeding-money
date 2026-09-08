@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { ExpenseCategory, RecurringExpense, SavingsFinding } from '../domain/types'
 
+const setup = await $fetch<{ onboardingNeeded: boolean }>('/api/setup')
+if (setup.onboardingNeeded) await navigateTo('/welcome')
+
 const store = useSavingsStore()
 await callOnce(() => store.refresh())
 

@@ -4,13 +4,13 @@ import { MemoryRepository } from '../../server/db/repository'
 
 describe('fluxo de resolução', () => {
   it('parte de exatamente 57–81 €/mês potenciais', async () => {
-    const repo = new MemoryRepository()
+    const repo = new MemoryRepository({ demo: true })
     const open = (await repo.listFindings(DEMO_USER_ID)).filter(item => item.status === 'open')
     expect(open.reduce((sum, item) => sum + item.estimatedMonthlySavingMinCents, 0)).toBe(5700)
     expect(open.reduce((sum, item) => sum + item.estimatedMonthlySavingMaxCents, 0)).toBe(8100)
   })
   it('resolve Vodafone 48,90→34,90, cria ação imutável e atualiza despesa e snapshot', async () => {
-    const repo = new MemoryRepository()
+    const repo = new MemoryRepository({ demo: true })
     const findingId = '40000000-0000-4000-8000-000000000002'
     const action = await repo.resolveFinding(DEMO_USER_ID, findingId, 3490, '2026-09-06')
     expect(action.annualSavingCents).toBe(16800)
@@ -22,7 +22,7 @@ describe('fluxo de resolução', () => {
     await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 3000, '2026-09-07')).rejects.toThrow()
   })
   it('impede acesso entre utilizadores e transições inválidas', async () => {
-    const repo = new MemoryRepository()
+    const repo = new MemoryRepository({ demo: true })
     const id = '40000000-0000-4000-8000-000000000001'
     await expect(repo.dismissFinding('00000000-0000-4000-8000-999999999999', id)).rejects.toThrow()
     await repo.dismissFinding(DEMO_USER_ID, id)

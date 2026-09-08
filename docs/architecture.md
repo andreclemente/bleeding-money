@@ -35,7 +35,11 @@ Datas civis usam `date`; auditoria usa `timestamp with time zone`. UUIDs são ge
 
 Foi escolhido **Drizzle** em vez de Prisma porque mantém o schema próximo de SQL/PostgreSQL, produz migrations transparentes e tipadas, tem runtime pequeno e não exige cliente binário. O domínio não importa Drizzle.
 
-O MVP usa um utilizador de desenvolvimento substituível por um `DevUserContext`; todos os acessos são filtrados por esse utilizador. Com `DATABASE_URL`, a API usa PostgreSQL; sem configuração usa explicitamente um repositório de fixtures em memória para demonstração local, sem alegar persistência. A seed PostgreSQL contém os mesmos dados canónicos. A resolução usa uma transação que valida a transição `open → resolved`, cria uma `SavingAction` imutável, atualiza o custo atual e acrescenta um snapshot.
+O MVP usa um utilizador de desenvolvimento substituível por um `DevUserContext`; todos os acessos são filtrados por esse utilizador. Com `DATABASE_URL`, a API usa PostgreSQL. Sem configuração, usa `JsonFileRepository`: começa sem dados pessoais e persiste o estado em `.data/bleedingmoney.json` (ou `LOCAL_DATA_FILE`). Cada mutação é serializada no processo e gravada num ficheiro temporário que é renomeado atomicamente; JSON ausente cria estado vazio, mas JSON corrupto falha de forma explícita e nunca é substituído. `BLEEDINGMONEY_DEMO=true` ativa as fixtures pessoais apenas na criação de um armazenamento local ainda inexistente. A seed PostgreSQL continua a conter os mesmos dados canónicos para demonstrações controladas. A resolução usa uma transação que valida a transição `open → resolved`, cria uma `SavingAction` imutável, atualiza o custo atual e acrescenta um snapshot.
+
+## Onboarding e fronteira de privacidade
+
+`GET /api/setup` consulta apenas a existência de despesas do utilizador atual e responde com `{ onboardingNeeded, storageMode }`. O endpoint não devolve identificadores, montantes, fornecedores ou outros dados pessoais. `/` e `/dashboard` encaminham instalações vazias para `/welcome`; o mesmo `ExpenseWizard` guiado serve o onboarding e `/expenses/new`, e cria a despesa através de `POST /api/expenses`. Ele recolhe informação por etapas e envia `contractStartDate` e `commitmentEndDate` para categorias com fidelização, sem guardar uma coluna de duração derivada.
 
 Benchmarks exigem 10 observações comparáveis, filtradas por categoria, fornecedor, tipo, atributos relevantes, país e 12 meses. Percentis usam interpolação linear. Findings seed demonstram a análise inicial; novas despesas são analisadas pelo serviço.
 

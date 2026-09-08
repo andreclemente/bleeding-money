@@ -89,14 +89,14 @@ describe('snapshots e orquestração do SavingsEngine', () => {
 
 describe('resolução segura e reconciliação', () => {
   it('não reabre imediatamente o mesmo tipo que acabou de ser resolvido', async () => {
-    const repo = new MemoryRepository()
+    const repo = new MemoryRepository({ demo: true })
     await repo.resolveFinding(DEMO_USER_ID, '40000000-0000-4000-8000-000000000001', 0, '2026-09-06')
     const detail = await repo.getExpense(DEMO_USER_ID, '10000000-0000-4000-8000-000000000006')
     expect(detail?.findings.filter(item => item.status === 'open' && item.type === 'UNUSED_SERVICE')).toHaveLength(0)
   })
 
   it('rejeita custo superior, datas inválidas e fecha recomendações irmãs obsoletas', async () => {
-    const repo = new MemoryRepository()
+    const repo = new MemoryRepository({ demo: true })
     const findingId = '40000000-0000-4000-8000-000000000002'
     await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 5000, '2026-09-06')).rejects.toThrow('superior')
     await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 3490, '2026-02-30')).rejects.toThrow('Data inválida')

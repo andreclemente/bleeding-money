@@ -19,6 +19,8 @@ export default defineNuxtConfig({
   vite: { plugins: [vuetify({ autoImport: true })] },
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL || '',
+    localDataFile: process.env.LOCAL_DATA_FILE || '.data/bleedingmoney.json',
+    demo: process.env.BLEEDINGMONEY_DEMO === 'true',
     public: { appName: 'BleedingMoney' }
   },
   typescript: { strict: true, typeCheck: true }
