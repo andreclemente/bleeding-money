@@ -131,4 +131,19 @@ describe('RecommendationDetailDialog', () => {
 
     expect(wrapper.emitted('resolve')).toEqual([[1234]])
   })
+
+  it('trata avisos sem estimativa como revisão, sem custo novo nem poupança zero', () => {
+    const wrapper = mountDialog({ finding: {
+      ...finding,
+      type: 'CONTRACT_EXPIRING',
+      estimatedMonthlySavingMinCents: 0,
+      estimatedMonthlySavingMaxCents: 0
+    } })
+
+    expect(wrapper.text()).toContain('Poupança não estimada')
+    expect(wrapper.text()).toContain('Marcar revisão como concluída')
+    expect(wrapper.text()).not.toContain('Poupança mensal estimada')
+    expect(wrapper.find('[data-testid="new-cost"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="resolve-finding"]').exists()).toBe(false)
+  })
 })

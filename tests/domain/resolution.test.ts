@@ -28,4 +28,18 @@ describe('fluxo de resolução', () => {
     await repo.dismissFinding(DEMO_USER_ID, id)
     await expect(repo.resolveFinding(DEMO_USER_ID, id, 0, '2026-09-06')).rejects.toThrow()
   })
+
+  it('recusa transformar uma revisão factual sem estimativa numa poupança', async () => {
+    const repo = new MemoryRepository()
+    const renewalDate = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10)
+    const expense = await repo.createExpense(DEMO_USER_ID, {
+      category: 'insurance', provider: 'Seguradora', productName: 'Casa', monthlyCostCents: 2400,
+      details: { kind: 'insurance', policyType: 'home', renewalDate, coverageCodes: [] }
+    })
+    const finding = (await repo.getExpense(DEMO_USER_ID, expense.id))!.findings.find(item => item.type === 'CONTRACT_EXPIRING')!
+
+    await expect(repo.resolveFinding(DEMO_USER_ID, finding.id, 0, renewalDate)).rejects.toThrow(/poupança estimada/i)
+    expect(await repo.listActions(DEMO_USER_ID)).toHaveLength(0)
+    expect((await repo.getExpense(DEMO_USER_ID, expense.id))?.expense.monthlyCostCents).toBe(2400)
+  })
 })

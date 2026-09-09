@@ -18,6 +18,13 @@ const subscription = (index = 1) => ({
   monthlyCostCents: 1000 + index,
   details: { kind: 'subscription' as const, plan: `Plano ${index}` }
 })
+const insurance = (productName: string) => ({
+  category: 'insurance' as const,
+  provider: 'Seguradora',
+  productName,
+  monthlyCostCents: 2400,
+  details: { kind: 'insurance' as const, policyType: 'home' as const, coverageCodes: ['contents' as const] }
+})
 
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map(directory => rm(directory, { recursive: true, force: true })))
@@ -46,6 +53,17 @@ describe('modo local pessoal', () => {
     const restarted = new JsonFileRepository(file)
     expect(await restarted.listExpenses(DEMO_USER_ID)).toEqual([created])
     expect((await restarted.getExpense(DEMO_USER_ID, created.id))?.snapshots).toHaveLength(1)
+  })
+
+  it('persiste findings cruzados de seguros antes de os dispensar', async () => {
+    const { file } = await tempFile()
+    const repo = new JsonFileRepository(file)
+    const first = await repo.createExpense(DEMO_USER_ID, insurance('Casa A'))
+    await repo.createExpense(DEMO_USER_ID, insurance('Casa B'))
+
+    const overlap = (await repo.listFindings(DEMO_USER_ID)).find(item => item.expenseId === first.id && item.type === 'DUPLICATE_SERVICE')!
+    await expect(repo.dismissFinding(DEMO_USER_ID, overlap.id)).resolves.toMatchObject({ status: 'dismissed' })
+    expect((await new JsonFileRepository(file).listFindings(DEMO_USER_ID)).find(item => item.id === overlap.id)).toMatchObject({ status: 'dismissed' })
   })
 
   it('serializa mutações concorrentes e deixa apenas JSON completo', async () => {

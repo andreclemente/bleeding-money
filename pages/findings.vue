@@ -19,6 +19,7 @@ const current = computed(() => store.findings.find((item: SavingsFinding) => ite
 const currentExpense = computed(() => store.expenses.find((item: RecurringExpense) => item.id === current.value?.expenseId))
 const openFindings = computed<SavingsFinding[]>(() => store.findings.filter((item: SavingsFinding) => item.status === 'open'))
 const potentialTotal = computed(() => openFindings.value.reduce((total: number, item: SavingsFinding) => total + item.estimatedMonthlySavingMaxCents, 0))
+const hasEstimatedSaving = (finding: SavingsFinding) => finding.estimatedMonthlySavingMinCents > 0 || finding.estimatedMonthlySavingMaxCents > 0
 
 watch(() => route.query.open, (value: unknown) => {
   selected.value = typeof value === 'string' ? value : null
@@ -86,12 +87,22 @@ const dismiss = async () => {
     <template v-else>
       <div class="findings-summary">
         <div>
-          <strong>{{ openFindings.length }} {{ openFindings.length === 1 ? 'decisão pendente' : 'decisões pendentes' }}</strong>
+          <strong>{{ openFindings.length ? `${openFindings.length} ${openFindings.length === 1 ? 'decisão pendente' : 'decisões pendentes'}` : 'Sem decisões pendentes' }}</strong>
           <p>Abre uma recomendação para consultar toda a análise antes de decidir.</p>
         </div>
         <div class="recommendation-value">
-          até {{ money(potentialTotal) }}
-          <small>poupança potencial / mês</small>
+          <template v-if="potentialTotal > 0">
+            até {{ money(potentialTotal) }}
+            <small>poupança potencial / mês</small>
+          </template>
+          <template v-else-if="openFindings.length">
+            Sem poupanças potenciais estimadas
+            <small>avisos factuais por rever</small>
+          </template>
+          <template v-else>
+            Sem estimativa aplicável
+            <small>nenhuma decisão aberta</small>
+          </template>
         </div>
       </div>
 
@@ -136,8 +147,14 @@ const dismiss = async () => {
             </p>
           </div>
           <div class="recommendation-value">
-            {{ money(finding.estimatedMonthlySavingMinCents) }}–{{ money(finding.estimatedMonthlySavingMaxCents) }}
-            <small>estimativa / mês · Ver análise →</small>
+            <template v-if="hasEstimatedSaving(finding)">
+              {{ money(finding.estimatedMonthlySavingMinCents) }}–{{ money(finding.estimatedMonthlySavingMaxCents) }}
+              <small>estimativa / mês · Ver análise →</small>
+            </template>
+            <template v-else>
+              Poupança não estimada
+              <small>revisão factual · Ver análise →</small>
+            </template>
           </div>
         </button>
       </div>

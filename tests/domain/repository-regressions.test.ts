@@ -44,6 +44,7 @@ describe('DTO explícito de despesas', () => {
   it('rejeita detalhes incompatíveis e datas ou dinheiro inseguros', () => {
     expect(() => parseExpenseCreateInput({ category: 'bank', provider: 'B', productName: 'P', monthlyCostCents: 100, details: { kind: 'subscription', plan: 'X' } })).toThrow('Detalhes incompatíveis')
     expect(() => parseExpenseCreateInput({ category: 'subscription', provider: 'B', productName: 'P', monthlyCostCents: Number.MAX_SAFE_INTEGER + 1, details: { kind: 'subscription', plan: 'X' } })).toThrow('Custo inválido')
+    expect(() => parseExpenseCreateInput({ category: 'insurance', provider: 'B', productName: 'P', monthlyCostCents: 100, currency: 'USD', details: { kind: 'insurance', policyType: 'home', coverageCodes: [] } })).toThrow(/EUR/i)
     expect(() => parseExpenseCreateInput({ category: 'subscription', provider: 'B', productName: 'P', monthlyCostCents: 2_147_483_648, details: { kind: 'subscription', plan: 'X' } })).toThrow('Custo inválido')
     expect(() => parseExpensePatchInput({ contractEndDate: '2026-02-30' })).toThrow('Data inválida')
   })
@@ -84,6 +85,30 @@ describe('snapshots e orquestração do SavingsEngine', () => {
     expect((await repo.getExpense(DEMO_USER_ID, created.id))?.snapshots).toHaveLength(1)
     await repo.updateExpense(DEMO_USER_ID, created.id, parseExpensePatchInput({ details: { kind: 'telecom', connectionType: 'fiber', downloadSpeedMbps: 1000 } }))
     expect((await repo.getExpense(DEMO_USER_ID, created.id))?.snapshots.at(-1)).toMatchObject({ source: 'manual_update', properties: { details: { downloadSpeedMbps: 1000 } } })
+  })
+
+  it('mantém uma revisão de seguro dispensada fechada durante a atualização temporal', async () => {
+    const repo = new MemoryRepository()
+    const first = await repo.createExpense(DEMO_USER_ID, parseExpenseCreateInput({ category: 'insurance', provider: 'A', productName: 'Casa A', monthlyCostCents: 2000, details: { kind: 'insurance', policyType: 'home', coverageCodes: ['contents'] } }))
+    await repo.createExpense(DEMO_USER_ID, parseExpenseCreateInput({ category: 'insurance', provider: 'B', productName: 'Casa B', monthlyCostCents: 1500, details: { kind: 'insurance', policyType: 'home', coverageCodes: ['contents'] } }))
+    const overlap = (await repo.listFindings(DEMO_USER_ID)).find(item => item.expenseId === first.id && item.type === 'DUPLICATE_SERVICE')!
+    await repo.dismissFinding(DEMO_USER_ID, overlap.id)
+    expect((await repo.listFindings(DEMO_USER_ID)).filter(item => item.expenseId === first.id && item.type === 'DUPLICATE_SERVICE' && item.status === 'open')).toEqual([])
+  })
+
+  it('abre uma nova revisão para um novo ciclo de renovação já depois de dispensar o anterior', async () => {
+    const repo = new MemoryRepository()
+    const firstRenewal = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10)
+    const nextRenewal = new Date(Date.now() + 35 * 86_400_000).toISOString().slice(0, 10)
+    const policy = await repo.createExpense(DEMO_USER_ID, parseExpenseCreateInput({ category: 'insurance', provider: 'A', productName: 'Casa', monthlyCostCents: 2000, details: { kind: 'insurance', policyType: 'home', renewalDate: firstRenewal, coverageCodes: [] } }))
+    const first = (await repo.listFindings(DEMO_USER_ID)).find(item => item.expenseId === policy.id && item.type === 'CONTRACT_EXPIRING')!
+    await repo.dismissFinding(DEMO_USER_ID, first.id)
+
+    await repo.updateExpense(DEMO_USER_ID, policy.id, parseExpensePatchInput({ details: { kind: 'insurance', policyType: 'home', renewalDate: nextRenewal, coverageCodes: [] } }))
+    const reopened = (await repo.listFindings(DEMO_USER_ID)).filter(item => item.expenseId === policy.id && item.type === 'CONTRACT_EXPIRING' && item.status === 'open')
+
+    expect(reopened).toHaveLength(1)
+    expect(reopened[0]?.evidence.join(' ')).toContain(nextRenewal)
   })
 })
 

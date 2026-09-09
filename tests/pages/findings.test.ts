@@ -124,6 +124,23 @@ describe('pages/findings', () => {
     expect(wrapper.text()).toContain('20,02')
   })
 
+  it('não apresenta zero euros como poupança quando o aviso não tem estimativa', async () => {
+    store.findings = [{ ...finding, type: 'CONTRACT_EXPIRING', estimatedMonthlySavingMinCents: 0, estimatedMonthlySavingMaxCents: 0 }]
+    const wrapper = await mountPage()
+
+    expect(wrapper.text()).toContain('Poupança não estimada')
+    expect(wrapper.text()).toContain('Sem poupanças potenciais estimadas')
+    expect(wrapper.text()).not.toContain('0,00 €–0,00 €')
+  })
+
+  it('não afirma que existem avisos factuais quando a lista aberta está vazia', async () => {
+    store.findings = []
+    const wrapper = await mountPage()
+
+    expect(wrapper.text()).toContain('Sem decisões pendentes')
+    expect(wrapper.text()).not.toContain('avisos factuais por rever')
+  })
+
   it('clears selected state and only the open query on neutral close', async () => {
     const wrapper = await mountPage()
 

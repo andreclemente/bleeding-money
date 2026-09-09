@@ -8,6 +8,7 @@ await callOnce(() => store.refresh(requestFetch))
 const money = (cents: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(cents / 100)
 const date = (value: string | null) => value ? new Intl.DateTimeFormat('pt-PT', { dateStyle: 'medium' }).format(new Date(value)) : 'ainda não realizada'
 const priorityFindings = computed<SavingsFinding[]>(() => store.dashboard?.priorityFindings || [])
+const hasEstimatedSaving = (finding: SavingsFinding) => finding.estimatedMonthlySavingMinCents > 0 || finding.estimatedMonthlySavingMaxCents > 0
 </script>
 
 <template>
@@ -47,7 +48,15 @@ const priorityFindings = computed<SavingsFinding[]>(() => store.dashboard?.prior
         aria-labelledby="potential-title"
       >
         <div class="saving-primary">
-          <span id="potential-title">Poupança mensal potencial</span><strong>{{ money(store.dashboard.potentialMonthlyMinCents) }}–{{ money(store.dashboard.potentialMonthlyMaxCents) }}</strong><p>Intervalo somado das recomendações abertas; não é uma garantia.</p>
+          <template v-if="store.dashboard.potentialMonthlyMaxCents > 0">
+            <span id="potential-title">Poupança mensal potencial</span><strong>{{ money(store.dashboard.potentialMonthlyMinCents) }}–{{ money(store.dashboard.potentialMonthlyMaxCents) }}</strong><p>Intervalo somado das recomendações abertas; não é uma garantia.</p>
+          </template>
+          <template v-else-if="priorityFindings.length">
+            <span id="potential-title">Revisões factuais abertas</span><strong>Sem poupanças potenciais estimadas</strong><p>Os avisos atuais pedem confirmação; não existe ainda uma redução calculável.</p>
+          </template>
+          <template v-else>
+            <span id="potential-title">Monitor sem perdas identificadas</span><strong>Sem poupança potencial identificada</strong><p>Os dados atuais não ultrapassam nenhuma regra; não inventamos uma estimativa.</p>
+          </template>
         </div>
         <div class="saving-realized">
           <span>Poupança anual realizada</span><strong>{{ money(store.dashboard.realizedAnnualCents) }}</strong><p>Apenas ações que marcaste como concluídas.</p>
@@ -75,7 +84,7 @@ const priorityFindings = computed<SavingsFinding[]>(() => store.dashboard?.prior
             :key="finding.id"
           >
             <NuxtLink :to="`/findings?open=${finding.id}`">
-              <span class="action-copy"><small>Prioridade {{ finding.priority }} · {{ Math.round(finding.confidence * 100) }}% confiança</small><strong>{{ finding.title }}</strong><span>{{ finding.evidence[0] || finding.description }}</span></span><span class="action-saving">{{ money(finding.estimatedMonthlySavingMinCents) }}–{{ money(finding.estimatedMonthlySavingMaxCents) }}<small>/mês</small></span>
+              <span class="action-copy"><small>Prioridade {{ finding.priority }} · {{ Math.round(finding.confidence * 100) }}% confiança</small><strong>{{ finding.title }}</strong><span>{{ finding.evidence[0] || finding.description }}</span></span><span class="action-saving"><template v-if="hasEstimatedSaving(finding)">{{ money(finding.estimatedMonthlySavingMinCents) }}–{{ money(finding.estimatedMonthlySavingMaxCents) }}<small>/mês</small></template><template v-else>Poupança não estimada<small>revisão factual</small></template></span>
             </NuxtLink>
           </li>
         </ol>

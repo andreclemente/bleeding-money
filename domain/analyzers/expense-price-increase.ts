@@ -2,7 +2,7 @@ import { createFinding } from '../finding'
 import type { RecurringExpense, SavingsAnalyzer, SavingsContext } from '../types'
 
 export class ExpensePriceIncreaseAnalyzer implements SavingsAnalyzer {
-  supports() { return true }
+  supports(expense: RecurringExpense) { return expense.category !== 'insurance' }
   async analyze(expense: RecurringExpense, context: SavingsContext) {
     const snapshots = context.snapshots.filter(item => item.expenseId === expense.id).sort((a, b) => a.observedAt.localeCompare(b.observedAt))
     const baseline = snapshots[0]?.priceCents

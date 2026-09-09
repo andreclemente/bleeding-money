@@ -4,6 +4,8 @@ export type Severity = 'info' | 'low' | 'medium' | 'high'
 export type Effort = 'very_low' | 'low' | 'medium' | 'high'
 export type Urgency = 'low' | 'medium' | 'high'
 export type FindingStatus = 'open' | 'resolved' | 'dismissed'
+export type InsurancePolicyType = 'car' | 'home' | 'health' | 'life' | 'other'
+export type InsuranceCoverageCode = 'civil_liability' | 'own_damage' | 'building' | 'contents' | 'hospitalization' | 'outpatient' | 'death' | 'disability' | 'travel_assistance'
 export type FindingType = 'UNDERUTILIZATION' | 'PRICE_INCREASE' | 'MARKET_OVERPRICED' | 'CONTRACT_EXPIRING' | 'CONTRACT_EXPIRED' | 'DUPLICATE_SERVICE' | 'UNUSED_SERVICE' | 'WRONG_PLAN' | 'AVOIDABLE_FEE' | 'NEGOTIATION_OPPORTUNITY'
 
 export type ExpenseDetails =
@@ -11,6 +13,7 @@ export type ExpenseDetails =
   | { kind: 'telecom', connectionType: string, downloadSpeedMbps: number, uploadSpeedMbps?: number, mobileDataGb?: number, mobileLines?: number, tvIncluded?: boolean }
   | { kind: 'bank', accountMaintenanceFeeCents: number, cardAnnualFeeCents: number, transferFeesCents: number }
   | { kind: 'subscription', plan: string, lastUsedAt?: string, usageFrequency?: string }
+  | { kind: 'insurance', policyType: InsurancePolicyType, renewalDate?: string, coverageCodes: InsuranceCoverageCode[] }
   | { kind: 'generic', notes?: string }
 
 export interface RecurringExpense {

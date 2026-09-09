@@ -9,6 +9,7 @@ import { ExpensePriceIncreaseAnalyzer } from '../../domain/analyzers/expense-pri
 import { SubscriptionUnusedAnalyzer } from '../../domain/analyzers/subscription-unused'
 import { TelecomContractExpiredAnalyzer } from '../../domain/analyzers/telecom-contract-expired'
 import { TelecomMarketBenchmarkAnalyzer } from '../../domain/analyzers/telecom-market-benchmark'
+import { InsuranceAuditAnalyzer } from '../../domain/analyzers/insurance-audit'
 import type { MarketObservation, RecurringExpense, SavingsContext, SavingsFinding } from '../../domain/types'
 
 const now = new Date('2026-09-06T12:00:00Z')
@@ -76,6 +77,38 @@ describe('seis analyzers', () => {
     expect(await analyzer.analyze(base({ category: 'electricity', details: { kind: 'electricity', contractedPowerKva: 4.6, tariffType: 'simple', pricePerKwhCents: 16, powerPricePerDayCents: 40, annualConsumptionKwh: 2500, maxHistoricalPowerKva: 4.1 } }), context())).toHaveLength(0)
     expect((await analyzer.analyze(base({ category: 'electricity', details: { kind: 'electricity', contractedPowerKva: 20.7, tariffType: 'simple', pricePerKwhCents: 16, powerPricePerDayCents: 80, annualConsumptionKwh: 9000, maxHistoricalPowerKva: 11 } }), context()))[0]?.action).toContain('13,8 kVA')
     expect(await analyzer.analyze(base({ category: 'electricity', details: { kind: 'electricity', contractedPowerKva: 55, tariffType: 'simple', pricePerKwhCents: 16, powerPricePerDayCents: 120, annualConsumptionKwh: 12000, maxHistoricalPowerKva: 42 } }), context())).toHaveLength(0)
+  })
+})
+
+describe('auditoria factual de seguros', () => {
+  const policy = (overrides: Partial<RecurringExpense> = {}) => base({
+    category: 'insurance',
+    productName: 'Proteção casa',
+    details: { kind: 'insurance', policyType: 'home', renewalDate: '2026-09-28', coverageCodes: ['building', 'contents'] },
+    ...overrides
+  })
+
+  it('avisa antes da renovação sem inventar qualquer poupança', async () => {
+    const findings = await new InsuranceAuditAnalyzer().analyze(policy(), context({ expenses: [policy()] }))
+    expect(findings).toContainEqual(expect.objectContaining({ type: 'CONTRACT_EXPIRING', estimatedMonthlySavingMinCents: 0, estimatedMonthlySavingMaxCents: 0 }))
+  })
+
+  it('sinaliza apenas coberturas declaradas em comum e mantém o valor potencial a zero', async () => {
+    const current = policy()
+    const other = policy({ id: 'expense-2', productName: 'Proteção recheio', details: { kind: 'insurance', policyType: 'home', renewalDate: '2027-03-01', coverageCodes: ['contents'] } })
+    const findings = await new InsuranceAuditAnalyzer().analyze(current, context({ expenses: [current, other] }))
+    expect(findings).toContainEqual(expect.objectContaining({ type: 'DUPLICATE_SERVICE', estimatedMonthlySavingMinCents: 0, estimatedMonthlySavingMaxCents: 0 }))
+    expect(findings.find(item => item.type === 'DUPLICATE_SERVICE')?.evidence.join(' ')).toContain('Conteúdo/recheio')
+    expect(await new InsuranceAuditAnalyzer().analyze(current, context({ expenses: [current, policy({ id: 'expense-3', details: { kind: 'insurance', policyType: 'home', renewalDate: '2027-03-01', coverageCodes: ['civil_liability'] } })] }))).toHaveLength(1)
+    expect(await new InsuranceAuditAnalyzer().analyze(current, context({ expenses: [current, policy({ id: 'expense-4', details: { kind: 'insurance', policyType: 'car', coverageCodes: ['contents'] } })] }))).toHaveLength(1)
+  })
+
+  it('não deixa o analyzer genérico inventar poupança para seguros', () => {
+    expect(new ExpensePriceIncreaseAnalyzer().supports(policy({ monthlyCostCents: 5000 }))).toBe(false)
+  })
+
+  it('não cria conclusões sem renovação nem coberturas declaradas', async () => {
+    expect(await new InsuranceAuditAnalyzer().analyze(policy({ details: { kind: 'insurance', policyType: 'other', coverageCodes: [] } }), context())).toEqual([])
   })
 })
 

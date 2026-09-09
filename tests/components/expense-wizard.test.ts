@@ -29,6 +29,9 @@ const base = (overrides: Partial<ExpenseWizardState> = {}): ExpenseWizardState =
   accountMaintenanceFee: 0,
   cardAnnualFee: 0,
   transferFees: 0,
+  insurancePolicyType: 'home',
+  insuranceRenewalDate: '',
+  insuranceCoverages: [],
   ...overrides
 })
 
@@ -51,6 +54,13 @@ describe('pedido do assistente de despesas', () => {
     expect(request).not.toHaveProperty('contractStartDate')
     expect(request).not.toHaveProperty('commitmentEndDate')
   })
+
+  it('constrói um contrato de seguro com preço, renovação e coberturas declaradas', () => {
+    const request = buildExpenseRequest(base({ category: 'insurance', template: 'insurance_policy', provider: 'Seguradora', productName: 'Casa', monthlyCost: 24.5, insurancePolicyType: 'home', insuranceRenewalDate: '2026-11-15', insuranceCoverages: ['building', 'contents'] }))
+    expect(request).toMatchObject({ category: 'insurance', monthlyCostCents: 2450, details: { kind: 'insurance', policyType: 'home', renewalDate: '2026-11-15', coverageCodes: ['building', 'contents'] } })
+    expect(request).not.toHaveProperty('contractEndDate')
+    expect(() => parseExpenseCreateInput(request)).not.toThrow()
+  })
 })
 
 describe('validação das datas de fidelização', () => {
@@ -65,6 +75,18 @@ describe('validação das datas de fidelização', () => {
     expect(component).toContain('label="Início do contrato · opcional"')
     expect(component).toMatch(/form\.contractStartDate\s*&&\s*form\.commitmentEndDate\s*&&\s*form\.commitmentEndDate\s*<\s*form\.contractStartDate/)
     expect(component).not.toContain('Indica o início do contrato e o fim da fidelização.')
+  })
+
+  it('pergunta tipo, renovação e coberturas do seguro sem prometer poupança', async () => {
+    const component = await readFile(new URL('../../components/ExpenseWizard.vue', import.meta.url), 'utf8')
+    const detail = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+    expect(component).toMatch(/Tipo de seguro/i)
+    expect(component).toMatch(/Próxima renovação/i)
+    expect(component).toMatch(/Coberturas declaradas/i)
+    expect(component).toMatch(/não prova duplicação nem poupança/i)
+    expect(component).toMatch(/Nos seguros, este valor regista apenas o custo declarado/i)
+    expect(detail).toMatch(/Ficha do contrato/i)
+    expect(detail).toMatch(/Exclusões e franquias/i)
   })
 
   it('rejeita fim anterior ao início na criação', () => {

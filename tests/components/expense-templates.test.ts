@@ -8,11 +8,12 @@ const expected: Record<ExpenseTemplate, [string, string]> = {
   mobile_plan: ['telecom', 'telecom'],
   bank_account_card: ['bank', 'bank'],
   streaming: ['subscription', 'subscription'],
-  software_cloud_saas: ['subscription', 'subscription']
+  software_cloud_saas: ['subscription', 'subscription'],
+  insurance_policy: ['insurance', 'insurance']
 }
 
 describe('entrada guiada por perguntas', () => {
-  it('oferece exatamente os seis exemplos suportados', () => {
+  it('oferece todos os exemplos suportados, incluindo seguros auditáveis', () => {
     expect(expenseTemplates.map(item => item.value)).toEqual(Object.keys(expected))
   })
 
@@ -43,5 +44,20 @@ describe('entrada guiada por perguntas', () => {
     telecom.commitmentEndDate = '2027-01-01'
     expect(analyzerCapabilities(telecom).available).toContain('Fim da fidelização')
     expect(analyzerCapabilities(telecom).available).toContain('Comparação com a comunidade (se existirem 10 casos comparáveis)')
+  })
+
+  it('explica quais checks de seguro têm dados suficientes', () => {
+    const insurance = createExpenseWizardState()
+    applyExpenseTemplate(insurance, 'insurance_policy')
+    expect(analyzerCapabilities(insurance).unavailable).toEqual(expect.arrayContaining([
+      'Renovação do seguro — falta a data de renovação',
+      'Possível cobertura duplicada — faltam coberturas declaradas'
+    ]))
+    insurance.insuranceRenewalDate = '2026-10-01'
+    insurance.insuranceCoverages = ['building']
+    expect(analyzerCapabilities(insurance).available).toEqual(expect.arrayContaining([
+      'Revisão antes da renovação',
+      'Possíveis coberturas duplicadas entre os teus contratos'
+    ]))
   })
 })

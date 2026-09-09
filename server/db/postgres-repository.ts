@@ -2,6 +2,7 @@ import pg from 'pg'
 import { and, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { annualSaving } from '../../domain/savings'
+import { findingCycleKey } from '../../domain/finding'
 import { adultBand, amountBases, dependentBand, parseHouseholdInput, parseMonthlySpendInput, spendCategories, spendScopes, spendStatuses, supermarketCoverages, trackingIntents, type AnonymousCohortAggregate, type HouseholdInput, type HouseholdProfile, type MonthlySpendInput, type MonthlySpendPeriod } from '../../domain/spending'
 import type { ExpenseDetails, ExpenseSnapshot, MarketObservation, RecurringExpense, SavingAction, SavingsFinding } from '../../domain/types'
 import type { StoredOwner, StoredSession } from '../auth/types'
@@ -17,11 +18,17 @@ const dateFrom = (value: unknown): string | undefined => {
   return String(value).slice(0, 10)
 }
 const isoFrom = (value: unknown): string => value instanceof Date ? value.toISOString() : new Date(String(value)).toISOString()
-const detailsFrom = (row: Record<string, unknown>): ExpenseDetails => {
+const insurancePolicyTypes = ['car', 'home', 'health', 'life', 'other'] as const
+const insuranceCoverageCodes = ['civil_liability', 'own_damage', 'building', 'contents', 'hospitalization', 'outpatient', 'death', 'disability', 'travel_assistance'] as const
+export const detailsFrom = (row: Record<string, unknown>): ExpenseDetails => {
   if (row.category === 'electricity') return { kind: 'electricity', contractedPowerKva: Number(row.contracted_power_kva), tariffType: String(row.tariff_type), pricePerKwhCents: Number(row.price_per_kwh_cents), powerPricePerDayCents: Number(row.power_price_per_day_cents), annualConsumptionKwh: Number(row.annual_consumption_kwh), maxHistoricalPowerKva: Number(row.max_historical_power_kva) }
   if (row.category === 'telecom') return { kind: 'telecom', connectionType: String(row.connection_type), downloadSpeedMbps: Number(row.download_speed_mbps), uploadSpeedMbps: row.upload_speed_mbps === null ? undefined : Number(row.upload_speed_mbps), mobileDataGb: row.mobile_data_gb === null ? undefined : Number(row.mobile_data_gb), mobileLines: row.mobile_lines === null ? undefined : Number(row.mobile_lines), tvIncluded: row.tv_included === null ? undefined : Boolean(row.tv_included) }
   if (row.category === 'bank') return { kind: 'bank', accountMaintenanceFeeCents: Number(row.account_maintenance_fee_cents), cardAnnualFeeCents: Number(row.card_annual_fee_cents), transferFeesCents: Number(row.transfer_fees_cents) }
   if (row.category === 'subscription') return { kind: 'subscription', plan: String(row.plan), lastUsedAt: dateFrom(row.last_used_at), usageFrequency: row.usage_frequency === null ? undefined : String(row.usage_frequency) }
+  if (row.category === 'insurance' && row.policy_type !== null && row.policy_type !== undefined) {
+    if (!insurancePolicyTypes.includes(row.policy_type as typeof insurancePolicyTypes[number]) || !Array.isArray(row.coverage_codes) || !row.coverage_codes.every(value => insuranceCoverageCodes.includes(value as typeof insuranceCoverageCodes[number])) || new Set(row.coverage_codes).size !== row.coverage_codes.length) throw pgStoredError()
+    return { kind: 'insurance', policyType: row.policy_type as typeof insurancePolicyTypes[number], renewalDate: dateFrom(row.renewal_date), coverageCodes: row.coverage_codes as typeof insuranceCoverageCodes[number][] }
+  }
   return { kind: 'generic' }
 }
 const expenseFrom = (row: Record<string, unknown>): RecurringExpense => ({ id: String(row.id), userId: String(row.user_id), category: row.category as RecurringExpense['category'], provider: String(row.provider), productName: String(row.product_name), monthlyCostCents: Number(row.monthly_cost_cents), billingFrequency: row.billing_frequency as RecurringExpense['billingFrequency'], currency: String(row.currency), contractStartDate: dateFrom(row.contract_start_date), contractEndDate: dateFrom(row.contract_end_date), commitmentEndDate: dateFrom(row.commitment_end_date), details: detailsFrom(row), createdAt: isoFrom(row.created_at), updatedAt: isoFrom(row.updated_at) })
@@ -90,7 +97,7 @@ export const cohortFrom = (row: Record<string, unknown>): AnonymousCohortAggrega
     return { id: String(row.id), category: pgEnum(row.category, spendCategories), scope: pgEnum(row.scope, spendScopes), country: 'PT', adultBand: adultBandValue, dependentBand: dependentBandValue, supermarketCoverage: pgEnum(row.supermarket_coverage, supermarketCoverages), amountBasis: pgEnum(row.amount_basis, amountBases), status: pgEnum(row.status, spendStatuses), windowStart, windowEnd, householdCount: pgInteger(row.household_count), p25Cents, medianCents, p75Cents, source, confidence: pgFinite(row.confidence, 0, 1) }
   } catch { throw pgStoredError() }
 }
-const expenseSql = 'select e.*, ed.contracted_power_kva, ed.tariff_type, ed.price_per_kwh_cents, ed.power_price_per_day_cents, ed.annual_consumption_kwh, ed.max_historical_power_kva, td.connection_type, td.download_speed_mbps, td.upload_speed_mbps, td.mobile_data_gb, td.mobile_lines, td.tv_included, bd.account_maintenance_fee_cents, bd.card_annual_fee_cents, bd.transfer_fees_cents, sd.plan, sd.last_used_at, sd.usage_frequency from recurring_expenses e left join electricity_details ed on ed.expense_id=e.id left join telecom_details td on td.expense_id=e.id left join bank_details bd on bd.expense_id=e.id left join subscription_details sd on sd.expense_id=e.id'
+const expenseSql = 'select e.*, ed.contracted_power_kva, ed.tariff_type, ed.price_per_kwh_cents, ed.power_price_per_day_cents, ed.annual_consumption_kwh, ed.max_historical_power_kva, td.connection_type, td.download_speed_mbps, td.upload_speed_mbps, td.mobile_data_gb, td.mobile_lines, td.tv_included, bd.account_maintenance_fee_cents, bd.card_annual_fee_cents, bd.transfer_fees_cents, sd.plan, sd.last_used_at, sd.usage_frequency, id.policy_type, id.renewal_date, id.coverage_codes from recurring_expenses e left join electricity_details ed on ed.expense_id=e.id left join telecom_details td on td.expense_id=e.id left join bank_details bd on bd.expense_id=e.id left join subscription_details sd on sd.expense_id=e.id left join insurance_details id on id.expense_id=e.id'
 const snapshotProperties = (expense: RecurringExpense) => ({ provider: expense.provider, details: expense.details, contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate })
 const relevantState = (expense: RecurringExpense) => JSON.stringify({ provider: expense.provider, productName: expense.productName, monthlyCostCents: expense.monthlyCostCents, currency: expense.currency, contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate, details: expense.details })
 const findingValues = (finding: SavingsFinding) => [finding.title, finding.description, finding.estimatedMonthlySavingMinCents, finding.estimatedMonthlySavingMaxCents, finding.estimatedAnnualSavingMinCents, finding.estimatedAnnualSavingMaxCents, finding.confidence, finding.severity, finding.priority, finding.effort, finding.urgency, finding.action, finding.evidence]
@@ -154,15 +161,19 @@ export class PostgresRepository implements PoupancasRepository {
     if (details.kind === 'telecom') await db.query(`${update ? 'update telecom_details set connection_type=$2,download_speed_mbps=$3,upload_speed_mbps=$4,mobile_data_gb=$5,mobile_lines=$6,tv_included=$7 where expense_id=$1' : 'insert into telecom_details (expense_id,connection_type,download_speed_mbps,upload_speed_mbps,mobile_data_gb,mobile_lines,tv_included) values ($1,$2,$3,$4,$5,$6,$7)'}`, [id, details.connectionType, details.downloadSpeedMbps, details.uploadSpeedMbps, details.mobileDataGb, details.mobileLines, details.tvIncluded])
     if (details.kind === 'bank') await db.query(`${update ? 'update bank_details set account_maintenance_fee_cents=$2,card_annual_fee_cents=$3,transfer_fees_cents=$4 where expense_id=$1' : 'insert into bank_details (expense_id,account_maintenance_fee_cents,card_annual_fee_cents,transfer_fees_cents) values ($1,$2,$3,$4)'}`, [id, details.accountMaintenanceFeeCents, details.cardAnnualFeeCents, details.transferFeesCents])
     if (details.kind === 'subscription') await db.query(`${update ? 'update subscription_details set plan=$2,last_used_at=$3,usage_frequency=$4 where expense_id=$1' : 'insert into subscription_details (expense_id,plan,last_used_at,usage_frequency) values ($1,$2,$3,$4)'}`, [id, details.plan, details.lastUsedAt, details.usageFrequency])
+    if (details.kind === 'insurance') await db.query('insert into insurance_details (expense_id,policy_type,renewal_date,coverage_codes) values ($1,$2,$3,$4) on conflict (expense_id) do update set policy_type=excluded.policy_type,renewal_date=excluded.renewal_date,coverage_codes=excluded.coverage_codes', [id, details.policyType, details.renewalDate, JSON.stringify(details.coverageCodes)])
   }
   private async analyze(db: Queryable, userId: string, expense: RecurringExpense, excludedTypes: SavingsFinding['type'][] = []) {
-    const [snapshots, observations, expenses, openRows] = await Promise.all([
+    const [snapshots, observations, expenses, openRows, closedRows] = await Promise.all([
       db.query('select * from expense_snapshots where expense_id=$1 order by observed_at,created_at', [expense.id]),
       db.query('select * from market_observations'),
       this.listExpensesWith(db, userId),
-      db.query("select * from savings_findings where expense_id=$1 and status='open' for update", [expense.id])
+      db.query("select * from savings_findings where expense_id=$1 and status='open' for update", [expense.id]),
+      db.query("select * from savings_findings where expense_id=$1 and status<>'open'", [expense.id])
     ])
-    const generated = (await this.engine.analyze(expense, { now: new Date(), snapshots: snapshots.rows.map(snapshotFrom), marketObservations: observations.rows.map(observationFrom), expenses })).filter(item => !excludedTypes.includes(item.type))
+    const closedCycles = expense.category === 'insurance' ? new Set(closedRows.rows.map(row => findingCycleKey(findingFrom(row)))) : new Set<string>()
+    const generated = (await this.engine.analyze(expense, { now: new Date(), snapshots: snapshots.rows.map(snapshotFrom), marketObservations: observations.rows.map(observationFrom), expenses }))
+      .filter(item => !excludedTypes.includes(item.type) && !closedCycles.has(findingCycleKey(item)))
     const byType = new Map(openRows.rows.map(row => [String(row.type), findingFrom(row)]))
     const generatedTypes = generated.map(item => item.type)
     await db.query("update savings_findings set status='dismissed',dismissed_at=now() where expense_id=$1 and status='open' and not (type = any($2::text[]))", [expense.id, generatedTypes])
@@ -170,12 +181,30 @@ export class PostgresRepository implements PoupancasRepository {
       const existing = byType.get(finding.type)
       const values = findingValues(finding)
       if (existing) await db.query('update savings_findings set title=$2,description=$3,estimated_monthly_saving_min_cents=$4,estimated_monthly_saving_max_cents=$5,estimated_annual_saving_min_cents=$6,estimated_annual_saving_max_cents=$7,confidence=$8,severity=$9,priority=$10,effort=$11,urgency=$12,action=$13,evidence=$14 where id=$1', [existing.id, ...values])
-      else await db.query('insert into savings_findings (id,expense_id,type,title,description,estimated_monthly_saving_min_cents,estimated_monthly_saving_max_cents,estimated_annual_saving_min_cents,estimated_annual_saving_max_cents,confidence,severity,priority,effort,urgency,action,evidence,status,created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,\'open\',$17)', [finding.id, finding.expenseId, finding.type, ...values, new Date(finding.createdAt)])
+      else await db.query("insert into savings_findings (id,expense_id,type,title,description,estimated_monthly_saving_min_cents,estimated_monthly_saving_max_cents,estimated_annual_saving_min_cents,estimated_annual_saving_max_cents,confidence,severity,priority,effort,urgency,action,evidence,status,created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'open',$17) on conflict (expense_id,type) where status='open' do update set title=excluded.title,description=excluded.description,estimated_monthly_saving_min_cents=excluded.estimated_monthly_saving_min_cents,estimated_monthly_saving_max_cents=excluded.estimated_monthly_saving_max_cents,estimated_annual_saving_min_cents=excluded.estimated_annual_saving_min_cents,estimated_annual_saving_max_cents=excluded.estimated_annual_saving_max_cents,confidence=excluded.confidence,severity=excluded.severity,priority=excluded.priority,effort=excluded.effort,urgency=excluded.urgency,action=excluded.action,evidence=excluded.evidence", [finding.id, finding.expenseId, finding.type, ...values, new Date(finding.createdAt)])
+    }
+  }
+  private async analyzeInsurances(db: Queryable, userId: string) {
+    await db.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [userId])
+    for (const expense of (await this.listExpensesWith(db, userId)).filter(item => item.category === 'insurance' && item.details.kind === 'insurance')) {
+      await this.analyze(db, userId, expense)
     }
   }
 
   async listExpenses(userId: string) { return this.listExpensesWith(this.pool, userId) }
-  async getExpense(userId: string, id: string) { return this.getExpenseWith(this.pool, userId, id) }
+  async getExpense(userId: string, id: string) {
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      await this.analyzeInsurances(client, userId)
+      const result = await this.getExpenseWith(client, userId, id)
+      await client.query('commit')
+      return result
+    } catch (error) {
+      await client.query('rollback')
+      throw error
+    } finally { client.release() }
+  }
   async createExpense(userId: string, raw: ExpenseInput) {
     const input = parseExpenseCreateInput(raw)
     const client = await this.pool.connect()
@@ -186,9 +215,11 @@ export class PostgresRepository implements PoupancasRepository {
       await this.writeDetails(client, id, input.details)
       const created = (await this.getExpenseWith(client, userId, id))!.expense
       await client.query('insert into expense_snapshots (id,expense_id,observed_at,price_cents,plan,properties,source) values ($1,$2,current_date,$3,$4,$5,\'manual\')', [crypto.randomUUID(), id, created.monthlyCostCents, created.productName, snapshotProperties(created)])
-      await this.analyze(client, userId, created)
+      if (created.category === 'insurance') await this.analyzeInsurances(client, userId)
+      else await this.analyze(client, userId, created)
+      const result = (await this.getExpenseWith(client, userId, id))!.expense
       await client.query('commit')
-      return (await this.getExpense(userId, id))!.expense
+      return result
     } catch (error) {
       await client.query('rollback')
       throw error
@@ -199,6 +230,7 @@ export class PostgresRepository implements PoupancasRepository {
     const client = await this.pool.connect()
     try {
       await client.query('begin')
+      await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [userId])
       await client.query('select id from recurring_expenses where id=$1 and user_id=$2 for update', [id, userId])
       const current = await this.getExpenseWith(client, userId, id)
       if (!current) { await client.query('rollback'); return null }
@@ -210,15 +242,29 @@ export class PostgresRepository implements PoupancasRepository {
       if (input.details) await this.writeDetails(client, id, input.details, true)
       const updated = (await this.getExpenseWith(client, userId, id))!.expense
       await client.query("insert into expense_snapshots (id,expense_id,observed_at,price_cents,plan,properties,source) values ($1,$2,current_date,$3,$4,$5,'manual_update')", [crypto.randomUUID(), id, updated.monthlyCostCents, updated.details.kind === 'subscription' ? updated.details.plan : updated.productName, snapshotProperties(updated)])
-      await this.analyze(client, userId, updated)
+      if (updated.category === 'insurance') await this.analyzeInsurances(client, userId)
+      else await this.analyze(client, userId, updated)
+      const result = (await this.getExpenseWith(client, userId, id))!.expense
       await client.query('commit')
-      return (await this.getExpense(userId, id))!.expense
+      return result
     } catch (error) {
       await client.query('rollback')
       throw error
     } finally { client.release() }
   }
-  async listFindings(userId: string) { return (await this.pool.query('select f.* from savings_findings f join recurring_expenses e on e.id=f.expense_id where e.user_id=$1 order by f.priority desc', [userId])).rows.map(findingFrom) }
+  async listFindings(userId: string) {
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      await this.analyzeInsurances(client, userId)
+      const findings = (await client.query('select f.* from savings_findings f join recurring_expenses e on e.id=f.expense_id where e.user_id=$1 order by f.priority desc', [userId])).rows.map(findingFrom)
+      await client.query('commit')
+      return findings
+    } catch (error) {
+      await client.query('rollback')
+      throw error
+    } finally { client.release() }
+  }
   async getFinding(userId: string, id: string) { return (await this.listFindings(userId)).find(item => item.id === id) || null }
   async resolveFinding(userId: string, id: string, newCostCents: number, actionDate: string) {
     if (!Number.isSafeInteger(newCostCents) || newCostCents < 0 || newCostCents > Math.floor(2_147_483_647 / 12)) throw new Error('Novo custo inválido')
@@ -226,8 +272,10 @@ export class PostgresRepository implements PoupancasRepository {
     const client = await this.pool.connect()
     try {
       await client.query('begin')
-      const row = (await client.query("select f.id,f.type,f.expense_id,e.monthly_cost_cents from savings_findings f join recurring_expenses e on e.id=f.expense_id where f.id=$1 and e.user_id=$2 and f.status='open' for update", [id, userId])).rows[0]
+      await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [userId])
+      const row = (await client.query("select f.id,f.type,f.expense_id,f.estimated_monthly_saving_max_cents,e.monthly_cost_cents from savings_findings f join recurring_expenses e on e.id=f.expense_id where f.id=$1 and e.user_id=$2 and f.status='open' for update", [id, userId])).rows[0]
       if (!row) throw new Error('Finding não encontrado ou já fechado')
+      if (Number(row.estimated_monthly_saving_max_cents) <= 0) throw new Error('Esta revisão não tem uma poupança estimada e só pode ser concluída sem registar uma ação de poupança')
       const previousCostCents = Number(row.monthly_cost_cents)
       if (newCostCents > previousCostCents) throw new Error('O novo custo não pode ser superior ao custo anterior')
       const action: SavingAction = { id: crypto.randomUUID(), findingId: id, previousCostCents, newCostCents, actionDate, annualSavingCents: annualSaving(previousCostCents, newCostCents), createdAt: new Date().toISOString() }
@@ -245,9 +293,18 @@ export class PostgresRepository implements PoupancasRepository {
     } finally { client.release() }
   }
   async dismissFinding(userId: string, id: string) {
-    const row = (await this.pool.query("update savings_findings f set status='dismissed',dismissed_at=now() from recurring_expenses e where f.id=$1 and f.expense_id=e.id and e.user_id=$2 and f.status='open' returning f.*", [id, userId])).rows[0]
-    if (!row) throw new Error('Finding não encontrado ou já fechado')
-    return findingFrom(row)
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [userId])
+      const row = (await client.query("update savings_findings f set status='dismissed',dismissed_at=now() from recurring_expenses e where f.id=$1 and f.expense_id=e.id and e.user_id=$2 and f.status='open' returning f.*", [id, userId])).rows[0]
+      if (!row) throw new Error('Finding não encontrado ou já fechado')
+      await client.query('commit')
+      return findingFrom(row)
+    } catch (error) {
+      await client.query('rollback')
+      throw error
+    } finally { client.release() }
   }
   async listActions(userId: string) {
     const rows = (await this.pool.query('select a.* from saving_actions a join savings_findings f on f.id=a.finding_id join recurring_expenses e on e.id=f.expense_id where e.user_id=$1 order by a.action_date desc', [userId])).rows

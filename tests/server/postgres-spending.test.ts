@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { cohortFrom, householdFrom, spendPeriodFrom } from '../../server/db/postgres-repository'
+import { cohortFrom, detailsFrom, householdFrom, spendPeriodFrom } from '../../server/db/postgres-repository'
 
 const periodRow = {
   id: '10000000-0000-4000-8000-000000000010', user_id: '10000000-0000-4000-8000-000000000001',
@@ -12,6 +12,34 @@ const amount = { id: '10000000-0000-4000-8000-000000000011', periodId: periodRow
 const cohortRow = { id: '10000000-0000-4000-8000-000000000012', category: 'supermarket_total', scope: 'supermarket', country: 'PT', adult_band: '2', dependent_band: '1', supermarket_coverage: 'food_only', amount_basis: 'statement_or_receipts', status: 'complete', window_start: '2026-01-01', window_end: '2026-08-31', household_count: 10, p25_cents: 30000, median_cents: 40000, p75_cents: 50000, source: 'fixture', confidence: 0.8 }
 
 describe('paridade PostgreSQL fail-closed', () => {
+  it('fecha concorrência de findings e restringe todas as coberturas na base de dados', async () => {
+    const repository = await readFile(new URL('../../server/db/postgres-repository.ts', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../../drizzle/0005_condemned_tiger_shark.sql', import.meta.url), 'utf8')
+    expect(repository).toMatch(/pg_advisory_xact_lock/)
+    expect(repository).toMatch(/on conflict \(expense_id,type\) where status='open' do update/i)
+    const dismissal = repository.slice(repository.indexOf('async dismissFinding'), repository.indexOf('async listActions'))
+    expect(dismissal).toMatch(/pool\.connect\(\)/)
+    expect(dismissal).toMatch(/pg_advisory_xact_lock/)
+    expect(dismissal).toMatch(/commit/)
+    expect(migration).toMatch(/valid_insurance_coverages/)
+    expect(migration).toMatch(/count\(distinct value\)/i)
+    expect(migration).toMatch(/travel_assistance/)
+    expect(repository).toMatch(/estimated_monthly_saving_max_cents[\s\S]+não tem uma poupança estimada/i)
+  })
+
+  it('faz upsert dos detalhes ao converter seguros legados e obtém o lock de utilizador primeiro', async () => {
+    const repository = await readFile(new URL('../../server/db/postgres-repository.ts', import.meta.url), 'utf8')
+    const writeDetails = repository.slice(repository.indexOf('private async writeDetails'), repository.indexOf('private async analyze('))
+    expect(writeDetails).toMatch(/insert into insurance_details[\s\S]+on conflict \(expense_id\) do update/i)
+    const updateExpense = repository.slice(repository.indexOf('async updateExpense'), repository.indexOf('async listFindings'))
+    expect(updateExpense.indexOf('pg_advisory_xact_lock')).toBeGreaterThan(-1)
+    expect(updateExpense.indexOf('pg_advisory_xact_lock')).toBeLessThan(updateExpense.indexOf('for update'))
+  })
+
+  it('reconstitui os dados auditáveis de seguro e rejeita cobertura corrompida', () => {
+    expect(detailsFrom({ category: 'insurance', policy_type: 'home', renewal_date: '2026-11-15', coverage_codes: ['building', 'contents'] })).toEqual({ kind: 'insurance', policyType: 'home', renewalDate: '2026-11-15', coverageCodes: ['building', 'contents'] })
+    expect(() => detailsFrom({ category: 'insurance', policy_type: 'home', renewal_date: '2026-11-15', coverage_codes: ['invented'] })).toThrow(/PostgreSQL/i)
+  })
   it('rejeita país, composição, bandas e montantes/intenções armazenados inválidos', () => {
     expect(() => householdFrom({ user_id: periodRow.user_id, adults: 2, dependents: 1, country: 'ES', effective_at: '2026-01-01', updated_at: periodRow.updated_at })).toThrow(/PostgreSQL/i)
     expect(() => spendPeriodFrom({ ...periodRow, country: 'ES' }, [amount])).toThrow(/PostgreSQL/i)

@@ -64,6 +64,9 @@ export const bankDetails = pgTable('bank_details', {
 export const subscriptionDetails = pgTable('subscription_details', {
   expenseId: uuid('expense_id').primaryKey().references(() => recurringExpenses.id, { onDelete: 'cascade' }), plan: text('plan').notNull(), lastUsedAt: date('last_used_at'), usageFrequency: text('usage_frequency')
 })
+export const insuranceDetails = pgTable('insurance_details', {
+  expenseId: uuid('expense_id').primaryKey().references(() => recurringExpenses.id, { onDelete: 'cascade' }), policyType: text('policy_type').notNull(), renewalDate: date('renewal_date'), coverageCodes: jsonb('coverage_codes').$type<string[]>().notNull().default([])
+}, table => [check('insurance_details_policy_type_check', sql`${table.policyType} in ('car','home','health','life','other')`), check('insurance_details_coverages_check', sql`valid_insurance_coverages(${table.coverageCodes})`)])
 export const expenseSnapshots = pgTable('expense_snapshots', {
   id: uuid('id').primaryKey(), expenseId: uuid('expense_id').notNull().references(() => recurringExpenses.id, { onDelete: 'cascade' }), observedAt: date('observed_at').notNull(), priceCents: integer('price_cents').notNull(), plan: text('plan'), properties: jsonb('properties').$type<Record<string, unknown>>().notNull().default({}), source: text('source').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, table => [index('snapshots_expense_date_idx').on(table.expenseId, table.observedAt)])

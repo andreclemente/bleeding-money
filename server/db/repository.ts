@@ -6,10 +6,11 @@ import type { ExpenseDetails, ExpenseSnapshot, MarketObservation, RecurringExpen
 import { parsePasswordHash } from '../auth/crypto'
 import type { AuthRepository, StoredOwner, StoredSession } from '../auth/types'
 import { createSavingsEngine } from '../services/savings-engine'
+import { findingCycleKey } from '../../domain/finding'
 import { PostgresRepository } from './postgres-repository'
 import { demoActions, demoExpenses, demoFindings, demoMarketObservations, demoSnapshots } from './demo-data'
 
-type MvpCategory = Extract<RecurringExpense['category'], 'electricity' | 'telecom' | 'bank' | 'subscription'>
+type MvpCategory = Extract<RecurringExpense['category'], 'electricity' | 'telecom' | 'bank' | 'subscription' | 'insurance'>
 type CategoryDetails = Exclude<ExpenseDetails, { kind: 'generic' }>
 export interface ExpenseInput {
   category: MvpCategory
@@ -24,7 +25,9 @@ export interface ExpenseInput {
 }
 export type ExpensePatchInput = Partial<Omit<ExpenseInput, 'category'>>
 
-const categories = ['electricity', 'telecom', 'bank', 'subscription'] as const
+const categories = ['electricity', 'telecom', 'bank', 'subscription', 'insurance'] as const
+const insurancePolicyTypes = ['car', 'home', 'health', 'life', 'other'] as const
+const insuranceCoverageCodes = ['civil_liability', 'own_damage', 'building', 'contents', 'hospitalization', 'outpatient', 'death', 'disability', 'travel_assistance'] as const
 const baseCreateKeys = ['category', 'provider', 'productName', 'monthlyCostCents', 'currency', 'contractStartDate', 'contractEndDate', 'commitmentEndDate', 'details']
 const patchKeys = baseCreateKeys.filter(key => key !== 'category')
 const dateKeys = ['contractStartDate', 'contractEndDate', 'commitmentEndDate'] as const
@@ -95,6 +98,12 @@ const parseDetails = (value: unknown): CategoryDetails => {
     rejectUnknown(row, ['kind', 'plan', 'lastUsedAt', 'usageFrequency'])
     return { kind: 'subscription', plan: requiredText(row.plan, 'Plano'), lastUsedAt: optionalDate(row.lastUsedAt), usageFrequency: optionalText(row.usageFrequency, 'Frequência de utilização') }
   }
+  if (row.kind === 'insurance') {
+    rejectUnknown(row, ['kind', 'policyType', 'renewalDate', 'coverageCodes'])
+    if (!insurancePolicyTypes.includes(row.policyType as typeof insurancePolicyTypes[number])) throw new Error('Tipo de seguro inválido')
+    if (!Array.isArray(row.coverageCodes) || !row.coverageCodes.every(item => insuranceCoverageCodes.includes(item as typeof insuranceCoverageCodes[number])) || new Set(row.coverageCodes).size !== row.coverageCodes.length) throw new Error('Coberturas inválidas')
+    return { kind: 'insurance', policyType: row.policyType as typeof insurancePolicyTypes[number], renewalDate: optionalDate(row.renewalDate), coverageCodes: row.coverageCodes as typeof insuranceCoverageCodes[number][] }
+  }
   throw new Error('Detalhes inválidos')
 }
 
@@ -105,7 +114,10 @@ export const parseExpenseCreateInput = (value: unknown): ExpenseInput => {
   const details = parseDetails(row.details)
   if (details.kind !== row.category) throw new Error('Detalhes incompatíveis com a categoria')
   const result: ExpenseInput = { category: row.category as MvpCategory, provider: requiredText(row.provider, 'Fornecedor'), productName: requiredText(row.productName, 'Produto'), monthlyCostCents: monthlyMoney(row.monthlyCostCents), details }
-  if (row.currency !== undefined) result.currency = requiredText(row.currency, 'Moeda')
+  if (row.currency !== undefined) {
+    result.currency = requiredText(row.currency, 'Moeda')
+    if (result.currency !== 'EUR') throw new Error('A moeda suportada é EUR')
+  }
   for (const key of dateKeys) if (row[key] !== undefined) result[key] = optionalDate(row[key])
   validateCommitmentDates(result.contractStartDate, result.commitmentEndDate)
   return result
@@ -119,7 +131,10 @@ export const parseExpensePatchInput = (value: unknown): ExpensePatchInput => {
   if (row.provider !== undefined) result.provider = requiredText(row.provider, 'Fornecedor')
   if (row.productName !== undefined) result.productName = requiredText(row.productName, 'Produto')
   if (row.monthlyCostCents !== undefined) result.monthlyCostCents = monthlyMoney(row.monthlyCostCents)
-  if (row.currency !== undefined) result.currency = requiredText(row.currency, 'Moeda')
+  if (row.currency !== undefined) {
+    result.currency = requiredText(row.currency, 'Moeda')
+    if (result.currency !== 'EUR') throw new Error('A moeda suportada é EUR')
+  }
   if (row.details !== undefined) result.details = parseDetails(row.details)
   for (const key of dateKeys) if (row[key] !== undefined) result[key] = optionalDate(row[key])
   validateCommitmentDates(result.contractStartDate, result.commitmentEndDate)
@@ -229,7 +244,7 @@ const storedObject = (value: unknown) => object(value, 'Ficheiro de dados local 
 
 const validateStoredDetails = (value: unknown, category: RecurringExpense['category']) => {
   const row = storedObject(value)
-  if (category === 'gym' || category === 'insurance') {
+  if (category === 'gym' || (category === 'insurance' && row.kind === 'generic')) {
     rejectUnknown(row, ['kind', 'notes'])
     assertStored(row.kind === 'generic')
     storedOptionalText(row.notes)
@@ -532,11 +547,16 @@ export class MemoryRepository implements PoupancasRepository {
 
   async listExpenses(userId: string) { return structuredClone(this.expenses.filter(item => item.userId === userId)) }
   async getExpense(userId: string, id: string) {
+    await this.refreshInsuranceFindings(userId)
     const expense = this.expenses.find(item => item.id === id && item.userId === userId)
     return expense ? structuredClone({ expense, snapshots: this.snapshots.filter(item => item.expenseId === id), findings: this.findings.filter(item => item.expenseId === id) }) : null
   }
   private async generate(userId: string, expense: RecurringExpense, snapshots = this.snapshots, expenses = this.expenses, excludedTypes: SavingsFinding['type'][] = []) {
-    return (await this.engine.analyze(expense, { now: new Date(), snapshots, marketObservations: this.observations, expenses: expenses.filter(item => item.userId === userId) })).filter(item => !excludedTypes.includes(item.type))
+    const closedCycles = expense.category === 'insurance'
+      ? new Set(this.findings.filter(item => item.expenseId === expense.id && item.status !== 'open').map(findingCycleKey))
+      : new Set<string>()
+    return (await this.engine.analyze(expense, { now: new Date(), snapshots, marketObservations: this.observations, expenses: expenses.filter(item => item.userId === userId) }))
+      .filter(item => !excludedTypes.includes(item.type) && !closedCycles.has(findingCycleKey(item)))
   }
   private reconcile(expense: RecurringExpense, generated: SavingsFinding[]) {
     const generatedTypes = new Set(generated.map(item => item.type))
@@ -549,6 +569,11 @@ export class MemoryRepository implements PoupancasRepository {
       const existing = this.findings.find(item => item.expenseId === expense.id && item.type === finding.type && item.status === 'open')
       if (existing) Object.assign(existing, { ...finding, id: existing.id, createdAt: existing.createdAt })
       else this.findings.push(finding)
+    }
+  }
+  private async refreshInsuranceFindings(userId: string) {
+    for (const expense of this.expenses.filter(item => item.userId === userId && item.category === 'insurance' && item.details.kind === 'insurance')) {
+      this.reconcile(expense, await this.generate(userId, expense))
     }
   }
   async createExpense(userId: string, raw: ExpenseInput) {
@@ -581,6 +606,7 @@ export class MemoryRepository implements PoupancasRepository {
     return structuredClone(item)
   }
   async listFindings(userId: string) {
+    await this.refreshInsuranceFindings(userId)
     const ids = new Set(this.expenses.filter(item => item.userId === userId).map(item => item.id))
     return structuredClone(this.findings.filter(item => ids.has(item.expenseId)).sort((a, b) => b.priority - a.priority))
   }
@@ -591,6 +617,7 @@ export class MemoryRepository implements PoupancasRepository {
     const finding = this.findings.find(item => item.id === id && item.status === 'open')
     const expense = finding && this.expenses.find(item => item.id === finding.expenseId && item.userId === userId)
     if (!finding || !expense) throw new Error('Finding não encontrado ou já fechado')
+    if (finding.estimatedMonthlySavingMaxCents <= 0) throw new Error('Esta revisão não tem uma poupança estimada e só pode ser concluída sem registar uma ação de poupança')
     if (newCostCents > expense.monthlyCostCents) throw new Error('O novo custo não pode ser superior ao custo anterior')
     const timestamp = new Date().toISOString()
     const action: SavingAction = { id: crypto.randomUUID(), findingId: finding.id, previousCostCents: expense.monthlyCostCents, newCostCents, actionDate, annualSavingCents: annualSaving(expense.monthlyCostCents, newCostCents), createdAt: timestamp }
@@ -727,11 +754,11 @@ export class JsonFileRepository implements PoupancasRepository {
   getSession(tokenHash: string) { return this.read(() => this.repository.getSession(tokenHash)) }
   revokeSession(tokenHash: string, revokedAt: string) { return this.mutate(() => this.repository.revokeSession(tokenHash, revokedAt)) }
   claimLegacyExpenses(ownerId: string, legacyUserId: string, claimedAt: string) { return this.mutate(() => this.repository.claimLegacyExpenses(ownerId, legacyUserId, claimedAt)) }
-  getExpense(userId: string, id: string) { return this.read(() => this.repository.getExpense(userId, id)) }
+  getExpense(userId: string, id: string) { return this.mutate(() => this.repository.getExpense(userId, id)) }
   createExpense(userId: string, input: ExpenseInput) { return this.mutate(() => this.repository.createExpense(userId, input)) }
   updateExpense(userId: string, id: string, input: ExpensePatchInput) { return this.mutate(() => this.repository.updateExpense(userId, id, input)) }
-  listFindings(userId: string) { return this.read(() => this.repository.listFindings(userId)) }
-  getFinding(userId: string, id: string) { return this.read(() => this.repository.getFinding(userId, id)) }
+  listFindings(userId: string) { return this.mutate(() => this.repository.listFindings(userId)) }
+  getFinding(userId: string, id: string) { return this.mutate(() => this.repository.getFinding(userId, id)) }
   resolveFinding(userId: string, id: string, newCostCents: number, actionDate: string) { return this.mutate(() => this.repository.resolveFinding(userId, id, newCostCents, actionDate)) }
   dismissFinding(userId: string, id: string) { return this.mutate(() => this.repository.dismissFinding(userId, id)) }
   listActions(userId: string) { return this.read(() => this.repository.listActions(userId)) }

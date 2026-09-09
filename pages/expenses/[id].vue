@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ExpenseCategory, ExpenseSnapshot, RecurringExpense, SavingsFinding } from '../../domain/types'
+import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
 const { data, pending, error } = await useFetch<{
@@ -26,6 +26,12 @@ const categories: Record<ExpenseCategory, string> = {
   insurance: 'Seguro'
 }
 const openFindings = computed(() => data.value?.findings.filter(item => item.status === 'open') || [])
+type InsuranceDetails = Extract<RecurringExpense['details'], { kind: 'insurance' }>
+const insuranceDetails = computed<InsuranceDetails | null>(() => data.value?.expense.details.kind === 'insurance' ? data.value.expense.details : null)
+const policyTypes = { car: 'Automóvel', home: 'Casa', health: 'Saúde', life: 'Vida', other: 'Outro' } as const
+const coverageLabels: Record<InsuranceCoverageCode, string> = { civil_liability: 'Responsabilidade civil', own_damage: 'Danos próprios', building: 'Edifício', contents: 'Conteúdo/recheio', hospitalization: 'Hospitalização', outpatient: 'Ambulatório', death: 'Morte', disability: 'Invalidez', travel_assistance: 'Assistência em viagem' }
+const policyLabel = (details: InsuranceDetails) => policyTypes[details.policyType]
+const coverageText = (details: InsuranceDetails) => details.coverageCodes.length ? details.coverageCodes.map(code => coverageLabels[code]).join(', ') : 'Não declaradas'
 </script>
 
 <template>
@@ -84,6 +90,31 @@ const openFindings = computed(() => data.value?.findings.filter(item => item.sta
           <span>Custo recorrente / mês</span>
         </div>
       </header>
+
+      <section
+        v-if="insuranceDetails"
+        class="panel insurance-contract"
+        aria-labelledby="insurance-heading"
+      >
+        <div class="panel-header">
+          <div>
+            <div class="section-kicker">
+              Seguro auditável
+            </div>
+            <h2 id="insurance-heading">
+              Ficha do contrato
+            </h2>
+          </div>
+        </div>
+        <dl class="wizard-summary">
+          <div><dt>Tipo</dt><dd>{{ policyLabel(insuranceDetails) }}</dd></div>
+          <div><dt>Próxima renovação</dt><dd>{{ insuranceDetails.renewalDate ? date(insuranceDetails.renewalDate) : 'Não declarada' }}</dd></div>
+          <div><dt>Coberturas declaradas</dt><dd>{{ coverageText(insuranceDetails) }}</dd></div>
+        </dl>
+        <p class="page-subtitle">
+          Compara sempre capitais, pessoas ou bens cobertos, exclusões e franquias. Uma cobertura com o mesmo nome noutro contrato é apenas um sinal para rever, não uma poupança calculada.
+        </p>
+      </section>
 
       <div class="detail-grid">
         <section

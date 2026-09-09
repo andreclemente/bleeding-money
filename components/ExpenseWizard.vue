@@ -141,7 +141,13 @@ const addAnother = () => {
               min="0"
               step="0.01"
               variant="outlined"
-            /><p><strong>Exemplo:</strong> 39,90 €. <strong>Porque perguntamos:</strong> calcula aumentos e intervalos de poupança.</p>
+            />
+            <p v-if="form.category === 'insurance'">
+              <strong>Exemplo:</strong> 39,90 €. <strong>Porque perguntamos:</strong> nos seguros, este valor regista apenas o custo declarado; não calculamos poupança sem uma proposta comparável.
+            </p>
+            <p v-else>
+              <strong>Exemplo:</strong> 39,90 €. <strong>Porque perguntamos:</strong> calcula aumentos e intervalos de poupança.
+            </p>
           </div>
         </template>
         <template v-else-if="current === 'details'">
@@ -201,6 +207,35 @@ const addAnother = () => {
                 step="0.01"
                 variant="outlined"
               /><p><strong>Exemplo:</strong> 7,90 €. <strong>Porque perguntamos:</strong> uma comissão positiva ativa o check de custo evitável.</p>
+            </div>
+          </template>
+          <template v-else-if="form.category === 'insurance'">
+            <div class="question-block">
+              <v-select
+                v-model="form.insurancePolicyType"
+                label="Tipo de seguro"
+                :items="[{ title: 'Automóvel', value: 'car' }, { title: 'Casa', value: 'home' }, { title: 'Saúde', value: 'health' }, { title: 'Vida', value: 'life' }, { title: 'Outro', value: 'other' }]"
+                variant="outlined"
+              /><p><strong>Porque perguntamos:</strong> identifica o contrato sem o comparar com seguros de natureza diferente.</p>
+            </div>
+            <div class="question-block">
+              <v-text-field
+                v-model="form.insuranceRenewalDate"
+                label="Próxima renovação · opcional"
+                type="date"
+                variant="outlined"
+              /><p><strong>Porque perguntamos:</strong> permite lembrar a revisão do prémio, exclusões e franquias até 45 dias antes.</p>
+            </div>
+            <div class="question-block">
+              <v-select
+                v-model="form.insuranceCoverages"
+                label="Coberturas declaradas · opcional"
+                :items="[{ title: 'Responsabilidade civil', value: 'civil_liability' }, { title: 'Danos próprios', value: 'own_damage' }, { title: 'Edifício', value: 'building' }, { title: 'Conteúdo/recheio', value: 'contents' }, { title: 'Hospitalização', value: 'hospitalization' }, { title: 'Ambulatório', value: 'outpatient' }, { title: 'Morte', value: 'death' }, { title: 'Invalidez', value: 'disability' }, { title: 'Assistência em viagem', value: 'travel_assistance' }]"
+                multiple
+                chips
+                closable-chips
+                variant="outlined"
+              /><p><strong>Porque perguntamos:</strong> assinalamos nomes repetidos noutros contratos. Isso não prova duplicação nem poupança; é preciso comparar capitais, bens, pessoas, exclusões e franquias.</p>
             </div>
           </template>
           <template v-else>

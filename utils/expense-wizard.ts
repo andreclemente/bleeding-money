@@ -1,7 +1,7 @@
 import type { ExpenseInput } from '../server/db/repository'
 
 type Category = ExpenseInput['category']
-export type ExpenseTemplate = 'electricity_bill' | 'internet_tv' | 'mobile_plan' | 'bank_account_card' | 'streaming' | 'software_cloud_saas'
+export type ExpenseTemplate = 'electricity_bill' | 'internet_tv' | 'mobile_plan' | 'bank_account_card' | 'streaming' | 'software_cloud_saas' | 'insurance_policy'
 
 export const expenseTemplates: Array<{ value: ExpenseTemplate, title: string, example: string, category: Category }> = [
   { value: 'electricity_bill', title: 'Fatura de eletricidade', example: 'Ex.: EDP, Goldenergy ou Endesa', category: 'electricity' },
@@ -9,7 +9,8 @@ export const expenseTemplates: Array<{ value: ExpenseTemplate, title: string, ex
   { value: 'mobile_plan', title: 'Tarifário móvel', example: 'Ex.: 20 GB e uma linha móvel', category: 'telecom' },
   { value: 'bank_account_card', title: 'Conta bancária ou cartão', example: 'Ex.: manutenção de conta e anuidade', category: 'bank' },
   { value: 'streaming', title: 'Streaming', example: 'Ex.: Netflix, Spotify ou Disney+', category: 'subscription' },
-  { value: 'software_cloud_saas', title: 'Software, cloud ou SaaS', example: 'Ex.: ChatGPT, Adobe ou armazenamento cloud', category: 'subscription' }
+  { value: 'software_cloud_saas', title: 'Software, cloud ou SaaS', example: 'Ex.: ChatGPT, Adobe ou armazenamento cloud', category: 'subscription' },
+  { value: 'insurance_policy', title: 'Seguro', example: 'Ex.: automóvel, casa, saúde ou vida', category: 'insurance' }
 ]
 
 export interface ExpenseWizardState {
@@ -39,13 +40,17 @@ export interface ExpenseWizardState {
   plan: string
   lastUsedAt: string
   usageFrequency: string
+  insurancePolicyType: 'car' | 'home' | 'health' | 'life' | 'other'
+  insuranceRenewalDate: string
+  insuranceCoverages: Array<'civil_liability' | 'own_damage' | 'building' | 'contents' | 'hospitalization' | 'outpatient' | 'death' | 'disability' | 'travel_assistance'>
 }
 
 export const createExpenseWizardState = (): ExpenseWizardState => ({
   category: 'subscription', provider: '', productName: '', monthlyCost: 0, hasCommitment: null, contractStartDate: '', commitmentEndDate: '',
   contractedPowerKva: 3.45, tariffType: 'simples', pricePerKwh: 0, powerPricePerDay: 0, annualConsumptionKwh: 0, maxHistoricalPowerKva: 0,
   connectionType: 'fiber', downloadSpeedMbps: 100, uploadSpeedMbps: 0, mobileDataGb: 0, mobileLines: 0, tvIncluded: false,
-  accountMaintenanceFee: 0, cardAnnualFee: 0, transferFees: 0, plan: '', lastUsedAt: '', usageFrequency: ''
+  accountMaintenanceFee: 0, cardAnnualFee: 0, transferFees: 0, plan: '', lastUsedAt: '', usageFrequency: '',
+  insurancePolicyType: 'other', insuranceRenewalDate: '', insuranceCoverages: []
 })
 
 export const applyExpenseTemplate = (form: ExpenseWizardState, template: ExpenseTemplate) => {
@@ -79,6 +84,12 @@ export const analyzerCapabilities = (form: ExpenseWizardState) => {
     if (form.contractedPowerKva > 0 && form.maxHistoricalPowerKva > 0) available.push('Potência elétrica contratada')
     else unavailable.push('Potência elétrica contratada — faltam potência atual e máximo histórico')
   }
+  if (form.category === 'insurance') {
+    if (form.insuranceRenewalDate) available.push('Revisão antes da renovação')
+    else unavailable.push('Renovação do seguro — falta a data de renovação')
+    if (form.insuranceCoverages.length) available.push('Possíveis coberturas duplicadas entre os teus contratos')
+    else unavailable.push('Possível cobertura duplicada — faltam coberturas declaradas')
+  }
   return { available, unavailable }
 }
 
@@ -90,6 +101,7 @@ export const buildExpenseRequest = (form: ExpenseWizardState): ExpenseInput => {
   if (form.category === 'electricity') details = { kind: 'electricity', contractedPowerKva: form.contractedPowerKva, tariffType: form.tariffType, pricePerKwhCents: cents(form.pricePerKwh), powerPricePerDayCents: cents(form.powerPricePerDay), annualConsumptionKwh: form.annualConsumptionKwh, maxHistoricalPowerKva: form.maxHistoricalPowerKva }
   else if (form.category === 'telecom') details = { kind: 'telecom', connectionType: form.connectionType, downloadSpeedMbps: form.downloadSpeedMbps, uploadSpeedMbps: form.uploadSpeedMbps, mobileDataGb: form.mobileDataGb, mobileLines: form.mobileLines, tvIncluded: form.tvIncluded }
   else if (form.category === 'bank') details = { kind: 'bank', accountMaintenanceFeeCents: cents(form.accountMaintenanceFee), cardAnnualFeeCents: cents(form.cardAnnualFee), transferFeesCents: cents(form.transferFees) }
+  else if (form.category === 'insurance') details = { kind: 'insurance', policyType: form.insurancePolicyType, renewalDate: form.insuranceRenewalDate || undefined, coverageCodes: [...form.insuranceCoverages] }
   else details = withoutUndefined({ kind: 'subscription' as const, plan: form.plan || form.productName, lastUsedAt: form.lastUsedAt || undefined, usageFrequency: form.usageFrequency || undefined })
 
   return withoutUndefined({

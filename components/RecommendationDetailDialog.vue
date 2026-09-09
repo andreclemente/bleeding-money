@@ -38,6 +38,7 @@ const confidenceLabel = computed(() => {
   if (confidence >= 0.6) return 'Confiança média'
   return 'Confiança baixa'
 })
+const hasEstimatedSaving = computed(() => !!props.finding && (props.finding.estimatedMonthlySavingMinCents > 0 || props.finding.estimatedMonthlySavingMaxCents > 0))
 
 watch(
   [() => props.finding?.id, () => props.currentExpenseCostCents],
@@ -103,8 +104,9 @@ const resolve = () => {
 
         <div class="saving-highlight">
           <div>
-            <span class="data-label">Poupança mensal estimada</span>
-            <strong>{{ money(finding.estimatedMonthlySavingMinCents) }}–{{ money(finding.estimatedMonthlySavingMaxCents) }}</strong>
+            <span class="data-label">{{ hasEstimatedSaving ? 'Poupança mensal estimada' : 'Poupança não estimada' }}</span>
+            <strong v-if="hasEstimatedSaving">{{ money(finding.estimatedMonthlySavingMinCents) }}–{{ money(finding.estimatedMonthlySavingMaxCents) }}</strong>
+            <strong v-else>Sem proposta comparável confirmada</strong>
           </div>
           <span class="confidence-badge">{{ confidenceLabel }} · {{ Math.round(finding.confidence * 100) }}%</span>
         </div>
@@ -147,6 +149,7 @@ const resolve = () => {
         </section>
 
         <v-text-field
+          v-if="hasEstimatedSaving"
           v-model="newCost"
           class="resolution-field"
           label="Novo custo mensal (€)"
@@ -168,7 +171,12 @@ const resolve = () => {
 
         <div class="action-explanations">
           <p><strong>Dispensar</strong> remove esta recomendação da lista sem registar poupança.</p>
-          <p><strong>Marcar como resolvida</strong> regista a ação e calcula a poupança realizada.</p>
+          <p v-if="hasEstimatedSaving">
+            <strong>Marcar como resolvida</strong> regista a ação e calcula a poupança realizada.
+          </p>
+          <p v-else>
+            <strong>Marcar revisão como concluída</strong> fecha este aviso sem registar qualquer poupança.
+          </p>
         </div>
       </v-card-text>
 
@@ -179,7 +187,7 @@ const resolve = () => {
           :loading="busy"
           @click="emit('dismiss')"
         >
-          Dispensar
+          {{ hasEstimatedSaving ? 'Dispensar' : 'Marcar revisão como concluída' }}
         </v-btn>
         <div class="dialog-actions-primary">
           <v-btn
@@ -191,6 +199,7 @@ const resolve = () => {
             Decidir mais tarde
           </v-btn>
           <v-btn
+            v-if="hasEstimatedSaving"
             data-testid="resolve-finding"
             color="primary"
             :loading="busy"

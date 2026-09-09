@@ -4,12 +4,14 @@ import { ExpensePriceIncreaseAnalyzer } from '../../domain/analyzers/expense-pri
 import { SubscriptionUnusedAnalyzer } from '../../domain/analyzers/subscription-unused'
 import { TelecomContractExpiredAnalyzer } from '../../domain/analyzers/telecom-contract-expired'
 import { TelecomMarketBenchmarkAnalyzer } from '../../domain/analyzers/telecom-market-benchmark'
+import { InsuranceAuditAnalyzer } from '../../domain/analyzers/insurance-audit'
 import { SavingsEngine } from '../../domain/engine'
 
 export const createSavingsEngine = () => new SavingsEngine()
   .register(new ElectricityContractedPowerAnalyzer())
   .register(new TelecomMarketBenchmarkAnalyzer())
   .register(new TelecomContractExpiredAnalyzer())
+  .register(new InsuranceAuditAnalyzer())
   .register(new ExpensePriceIncreaseAnalyzer())
   .register(new BankMaintenanceFeeAnalyzer())
   .register(new SubscriptionUnusedAnalyzer())

@@ -19,4 +19,11 @@ export const createFinding = (input: {
     status: 'open', createdAt: input.now.toISOString()
   }
 }
+
+export const findingCycleKey = (finding: Pick<SavingsFinding, 'type' | 'evidence'>) => {
+  if (finding.type === 'CONTRACT_EXPIRING') return `${finding.type}:${finding.evidence[0] || ''}`
+  if (finding.type === 'DUPLICATE_SERVICE') return `${finding.type}:${finding.evidence.filter(item => !item.startsWith('Poupança estimada:')).sort().join('|')}`
+  return finding.type
+}
+
 export const euros = (cents: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(cents / 100)
