@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { annualSaving } from '../../domain/savings'
+import { adultBand, amountBases, dependentBand, parseHouseholdInput, parseMonthlySpendInput, spendCategories, spendScopes, spendStatuses, supermarketCoverages, trackingIntents, type AnonymousCohortAggregate, type HouseholdInput, type HouseholdProfile, type MonthlySpendInput, type MonthlySpendPeriod } from '../../domain/spending'
 import type { ExpenseDetails, ExpenseSnapshot, MarketObservation, RecurringExpense, SavingAction, SavingsFinding } from '../../domain/types'
 import { parsePasswordHash } from '../auth/crypto'
 import type { AuthRepository, StoredOwner, StoredSession } from '../auth/types'
@@ -135,13 +136,18 @@ export interface PoupancasRepository extends AuthRepository {
   resolveFinding(userId: string, id: string, newCostCents: number, actionDate: string): Promise<SavingAction>
   dismissFinding(userId: string, id: string): Promise<SavingsFinding>
   listActions(userId: string): Promise<SavingAction[]>
+  getHouseholdProfile(userId: string): Promise<HouseholdProfile | null>
+  upsertHouseholdProfile(userId: string, input: HouseholdInput): Promise<HouseholdProfile>
+  listMonthlySpendPeriods(userId: string): Promise<MonthlySpendPeriod[]>
+  upsertMonthlySpendPeriod(userId: string, input: MonthlySpendInput): Promise<MonthlySpendPeriod>
+  listAnonymousSpendCohorts(): Promise<AnonymousCohortAggregate[]>
 }
 
 const snapshotProperties = (expense: RecurringExpense) => ({ provider: expense.provider, details: structuredClone(expense.details), contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate })
 const relevantState = (expense: RecurringExpense) => JSON.stringify({ provider: expense.provider, productName: expense.productName, monthlyCostCents: expense.monthlyCostCents, currency: expense.currency, contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate, details: expense.details })
 
 export interface RepositoryState {
-  version: 2
+  version: 3
   expenses: RecurringExpense[]
   snapshots: ExpenseSnapshot[]
   findings: SavingsFinding[]
@@ -149,19 +155,25 @@ export interface RepositoryState {
   marketObservations: MarketObservation[]
   owner: StoredOwner | null
   sessions: StoredSession[]
+  householdProfiles: HouseholdProfile[]
+  monthlySpendPeriods: MonthlySpendPeriod[]
+  anonymousCohortAggregates: AnonymousCohortAggregate[]
 }
 
 interface MemoryRepositoryOptions { demo?: boolean, state?: RepositoryState }
 
 const initialState = (demo = false): RepositoryState => ({
-  version: 2,
+  version: 3,
   expenses: structuredClone(demo ? demoExpenses : []),
   snapshots: structuredClone(demo ? demoSnapshots : []),
   findings: structuredClone(demo ? demoFindings : []),
   actions: structuredClone(demo ? demoActions : []),
   marketObservations: structuredClone(demoMarketObservations),
   owner: null,
-  sessions: []
+  sessions: [],
+  householdProfiles: [],
+  monthlySpendPeriods: [],
+  anonymousCohortAggregates: []
 })
 
 const expenseCategories = ['electricity', 'telecom', 'bank', 'subscription', 'gym', 'insurance'] as const
@@ -354,15 +366,79 @@ const parseStoredSession = (value: unknown): StoredSession => {
   return row as unknown as StoredSession
 }
 
+const parseStoredHouseholdProfile = (value: unknown): HouseholdProfile => {
+  const row = storedObject(value)
+  rejectUnknown(row, ['userId', 'adults', 'dependents', 'country', 'effectiveAt', 'updatedAt'])
+  storedUuid(row.userId)
+  parseHouseholdInput({ adults: row.adults, dependents: row.dependents, country: row.country })
+  storedDate(row.effectiveAt)
+  storedTimestamp(row.updatedAt)
+  return row as unknown as HouseholdProfile
+}
+
+const parseStoredSpendPeriod = (value: unknown): MonthlySpendPeriod => {
+  const row = storedObject(value)
+  rejectUnknown(row, ['id', 'userId', 'month', 'status', 'supermarketCoverage', 'amountBasis', 'country', 'adults', 'dependents', 'adultBand', 'dependentBand', 'createdAt', 'updatedAt', 'amounts'])
+  const id = storedUuid(row.id)
+  storedUuid(row.userId)
+  assertStored(Array.isArray(row.amounts))
+  const amounts = row.amounts.map(value => {
+    const amount = storedObject(value)
+    rejectUnknown(amount, ['id', 'periodId', 'category', 'scope', 'amountCents', 'trackingIntent', 'userTargetCents'])
+    storedUuid(amount.id)
+    assertStored(amount.periodId === id)
+    storedEnum(amount.category, spendCategories)
+    storedEnum(amount.scope, spendScopes)
+    storedMoney(amount.amountCents)
+    storedEnum(amount.trackingIntent, trackingIntents)
+    if (amount.userTargetCents !== undefined) storedMoney(amount.userTargetCents)
+    return amount
+  })
+  const parsed = parseMonthlySpendInput({ month: row.month, adults: row.adults, dependents: row.dependents, status: row.status, supermarketCoverage: row.supermarketCoverage, amountBasis: row.amountBasis, amounts: amounts.map(({ category, scope, amountCents, trackingIntent, userTargetCents }) => ({ category, scope, amountCents, trackingIntent, ...(userTargetCents === undefined ? {} : { userTargetCents }) })) })
+  assertStored(row.country === 'PT')
+  assertStored(row.adultBand === adultBand(parsed.adults))
+  assertStored(row.dependentBand === dependentBand(parsed.dependents))
+  storedTimestamp(row.createdAt)
+  storedTimestamp(row.updatedAt)
+  assertStored(parsed.month === row.month && uniqueIds(amounts as Array<{ id: string }>))
+  return row as unknown as MonthlySpendPeriod
+}
+
+const parseStoredCohort = (value: unknown): AnonymousCohortAggregate => {
+  const row = storedObject(value)
+  rejectUnknown(row, ['id', 'category', 'scope', 'country', 'adultBand', 'dependentBand', 'supermarketCoverage', 'amountBasis', 'status', 'windowStart', 'windowEnd', 'householdCount', 'p25Cents', 'medianCents', 'p75Cents', 'source', 'confidence'])
+  storedUuid(row.id)
+  storedEnum(row.category, spendCategories)
+  storedEnum(row.scope, spendScopes)
+  assertStored(row.country === 'PT')
+  assertStored(['1', '2', '3plus'].includes(String(row.adultBand)) && ['0', '1', '2plus'].includes(String(row.dependentBand)))
+  storedEnum(row.supermarketCoverage, supermarketCoverages)
+  storedEnum(row.amountBasis, amountBases)
+  storedEnum(row.status, spendStatuses)
+  storedDate(row.windowStart)
+  storedDate(row.windowEnd)
+  const count = storedMoney(row.householdCount)
+  const p25 = storedMoney(row.p25Cents)
+  const median = storedMoney(row.medianCents)
+  const p75 = storedMoney(row.p75Cents)
+  storedText(row.source)
+  storedFinite(row.confidence, 0, 1)
+  assertStored(count >= 0 && p25 <= median && median <= p75)
+  return row as unknown as AnonymousCohortAggregate
+}
+
 const uniqueIds = (items: Array<{ id: string }>) => new Set(items.map(item => item.id)).size === items.length
 
 const parseRepositoryState = (value: unknown): RepositoryState => {
   try {
     const row = storedObject(value)
     const version = row.version
-    rejectUnknown(row, version === 1 ? ['version', 'expenses', 'snapshots', 'findings', 'actions'] : ['version', 'expenses', 'snapshots', 'findings', 'actions', 'marketObservations', 'owner', 'sessions'])
-    assertStored((version === 1 || version === 2) && Array.isArray(row.expenses) && Array.isArray(row.snapshots) && Array.isArray(row.findings) && Array.isArray(row.actions))
-    if (version === 2) assertStored(Array.isArray(row.marketObservations) && Array.isArray(row.sessions))
+    const baseKeys = ['version', 'expenses', 'snapshots', 'findings', 'actions', 'marketObservations', 'owner', 'sessions']
+    const spendingKeys = ['householdProfiles', 'monthlySpendPeriods', 'anonymousCohortAggregates']
+    rejectUnknown(row, version === 1 ? ['version', 'expenses', 'snapshots', 'findings', 'actions'] : version === 3 ? [...baseKeys, ...spendingKeys] : baseKeys)
+    assertStored((version === 1 || version === 2 || version === 3) && Array.isArray(row.expenses) && Array.isArray(row.snapshots) && Array.isArray(row.findings) && Array.isArray(row.actions))
+    if (version === 2 || version === 3) assertStored(Array.isArray(row.marketObservations) && Array.isArray(row.sessions))
+    if (version === 3) assertStored(Array.isArray(row.householdProfiles) && Array.isArray(row.monthlySpendPeriods) && Array.isArray(row.anonymousCohortAggregates))
     const expenses = row.expenses.map(parseStoredExpense)
     const snapshots = row.snapshots.map(parseStoredSnapshot)
     const findings = row.findings.map(parseStoredFinding)
@@ -370,7 +446,13 @@ const parseRepositoryState = (value: unknown): RepositoryState => {
     const marketObservations = version === 1 ? structuredClone(demoMarketObservations) : (row.marketObservations as unknown[]).map(parseStoredObservation)
     const owner = version === 1 ? null : parseStoredOwner(row.owner)
     const sessions = version === 1 ? [] : (row.sessions as unknown[]).map(parseStoredSession)
-    assertStored(uniqueIds(expenses) && uniqueIds(snapshots) && uniqueIds(findings) && uniqueIds(actions) && uniqueIds(marketObservations) && uniqueIds(sessions))
+    const householdProfiles = version === 3 ? (row.householdProfiles as unknown[]).map(parseStoredHouseholdProfile) : []
+    const monthlySpendPeriods = version === 3 ? (row.monthlySpendPeriods as unknown[]).map(parseStoredSpendPeriod) : []
+    const anonymousCohortAggregates = version === 3 ? (row.anonymousCohortAggregates as unknown[]).map(parseStoredCohort) : []
+    assertStored(uniqueIds(expenses) && uniqueIds(snapshots) && uniqueIds(findings) && uniqueIds(actions) && uniqueIds(marketObservations) && uniqueIds(sessions) && uniqueIds(monthlySpendPeriods) && uniqueIds(anonymousCohortAggregates))
+    assertStored(new Set(householdProfiles.map(item => item.userId)).size === householdProfiles.length)
+    assertStored(new Set(monthlySpendPeriods.map(item => `${item.userId}:${item.month}`)).size === monthlySpendPeriods.length)
+    assertStored(uniqueIds(monthlySpendPeriods.flatMap(item => item.amounts)))
     const expenseIds = new Set(expenses.map(item => item.id))
     const findingsById = new Map(findings.map(item => [item.id, item]))
     const actionIds = new Set(actions.map(item => item.id))
@@ -384,7 +466,7 @@ const parseRepositoryState = (value: unknown): RepositoryState => {
       const savingActionId = snapshot.properties.savingActionId
       if (savingActionId !== undefined) assertStored(typeof savingActionId === 'string' && actionIds.has(savingActionId))
     }
-    return structuredClone({ version: 2, expenses, snapshots, findings, actions, marketObservations, owner, sessions })
+    return structuredClone({ version: 3, expenses, snapshots, findings, actions, marketObservations, owner, sessions, householdProfiles, monthlySpendPeriods, anonymousCohortAggregates })
   } catch {
     throw new Error('Ficheiro de dados local corrupto')
   }
@@ -398,6 +480,9 @@ export class MemoryRepository implements PoupancasRepository {
   private observations: MarketObservation[]
   private owner: StoredOwner | null
   private sessions: StoredSession[]
+  private householdProfiles: HouseholdProfile[]
+  private monthlySpendPeriods: MonthlySpendPeriod[]
+  private anonymousCohortAggregates: AnonymousCohortAggregate[]
   private engine = createSavingsEngine()
 
   constructor(options: MemoryRepositoryOptions = {}) {
@@ -409,10 +494,13 @@ export class MemoryRepository implements PoupancasRepository {
     this.observations = structuredClone(state.marketObservations)
     this.owner = structuredClone(state.owner)
     this.sessions = structuredClone(state.sessions)
+    this.householdProfiles = structuredClone(state.householdProfiles)
+    this.monthlySpendPeriods = structuredClone(state.monthlySpendPeriods)
+    this.anonymousCohortAggregates = structuredClone(state.anonymousCohortAggregates)
   }
 
   exportState(): RepositoryState {
-    return structuredClone({ version: 2, expenses: this.expenses, snapshots: this.snapshots, findings: this.findings, actions: this.actions, marketObservations: this.observations, owner: this.owner, sessions: this.sessions })
+    return structuredClone({ version: 3, expenses: this.expenses, snapshots: this.snapshots, findings: this.findings, actions: this.actions, marketObservations: this.observations, owner: this.owner, sessions: this.sessions, householdProfiles: this.householdProfiles, monthlySpendPeriods: this.monthlySpendPeriods, anonymousCohortAggregates: this.anonymousCohortAggregates })
   }
 
   async getOwner() { return structuredClone(this.owner) }
@@ -529,6 +617,49 @@ export class MemoryRepository implements PoupancasRepository {
     const findingIds = new Set(this.findings.filter(finding => this.expenses.some(expense => expense.id === finding.expenseId && expense.userId === userId)).map(item => item.id))
     return structuredClone(this.actions.filter(item => findingIds.has(item.findingId)))
   }
+  async getHouseholdProfile(userId: string) { return structuredClone(this.householdProfiles.find(item => item.userId === userId) || null) }
+  async upsertHouseholdProfile(userId: string, raw: HouseholdInput) {
+    const input = parseHouseholdInput(raw)
+    const now = new Date().toISOString()
+    const existing = this.householdProfiles.find(item => item.userId === userId)
+    if (existing) {
+      Object.assign(existing, input, { updatedAt: now })
+      return structuredClone(existing)
+    }
+    const profile: HouseholdProfile = { userId, ...input, effectiveAt: now.slice(0, 10), updatedAt: now }
+    this.householdProfiles.push(profile)
+    return structuredClone(profile)
+  }
+  async listMonthlySpendPeriods(userId: string) {
+    return structuredClone(this.monthlySpendPeriods.filter(item => item.userId === userId).sort((a, b) => b.month.localeCompare(a.month)))
+  }
+  async upsertMonthlySpendPeriod(userId: string, raw: MonthlySpendInput) {
+    const input = parseMonthlySpendInput(raw)
+    const now = new Date().toISOString()
+    const existing = this.monthlySpendPeriods.find(item => item.userId === userId && item.month === input.month)
+    const id = existing?.id || crypto.randomUUID()
+    const amounts = input.amounts.map(amount => ({ id: crypto.randomUUID(), periodId: id, ...structuredClone(amount) }))
+    const period: MonthlySpendPeriod = {
+      id,
+      userId,
+      month: input.month,
+      status: input.status,
+      supermarketCoverage: input.supermarketCoverage,
+      amountBasis: input.amountBasis,
+      country: 'PT',
+      adults: input.adults,
+      dependents: input.dependents,
+      adultBand: adultBand(input.adults),
+      dependentBand: dependentBand(input.dependents),
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+      amounts
+    }
+    if (existing) Object.assign(existing, period)
+    else this.monthlySpendPeriods.push(period)
+    return structuredClone(period)
+  }
+  async listAnonymousSpendCohorts() { return structuredClone(this.anonymousCohortAggregates) }
 }
 
 const fileMutationQueues = new Map<string, Promise<void>>()
@@ -604,6 +735,11 @@ export class JsonFileRepository implements PoupancasRepository {
   resolveFinding(userId: string, id: string, newCostCents: number, actionDate: string) { return this.mutate(() => this.repository.resolveFinding(userId, id, newCostCents, actionDate)) }
   dismissFinding(userId: string, id: string) { return this.mutate(() => this.repository.dismissFinding(userId, id)) }
   listActions(userId: string) { return this.read(() => this.repository.listActions(userId)) }
+  getHouseholdProfile(userId: string) { return this.read(() => this.repository.getHouseholdProfile(userId)) }
+  upsertHouseholdProfile(userId: string, input: HouseholdInput) { return this.mutate(() => this.repository.upsertHouseholdProfile(userId, input)) }
+  listMonthlySpendPeriods(userId: string) { return this.read(() => this.repository.listMonthlySpendPeriods(userId)) }
+  upsertMonthlySpendPeriod(userId: string, input: MonthlySpendInput) { return this.mutate(() => this.repository.upsertMonthlySpendPeriod(userId, input)) }
+  listAnonymousSpendCohorts() { return this.read(() => this.repository.listAnonymousSpendCohorts()) }
 }
 
 let postgres: PostgresRepository | undefined

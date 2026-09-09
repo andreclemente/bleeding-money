@@ -1,5 +1,6 @@
 export interface RouteGuardState { path: string, authenticated: boolean, registrationAvailable: boolean, onboardingNeeded: boolean }
 const publicPaths = ['/login', '/register', '/how-it-works']
+const onboardingPaths = ['/welcome', '/spending']
 
 export const routeGuardDestination = (state: RouteGuardState) => {
   if (!state.authenticated) {
@@ -8,7 +9,7 @@ export const routeGuardDestination = (state: RouteGuardState) => {
     return state.path === target ? null : target
   }
   if (state.path === '/login' || state.path === '/register') return state.onboardingNeeded ? '/welcome' : '/dashboard'
-  if (state.onboardingNeeded && state.path !== '/welcome' && !publicPaths.includes(state.path)) return '/welcome'
+  if (state.onboardingNeeded && !onboardingPaths.includes(state.path) && !publicPaths.includes(state.path)) return '/welcome'
   if (!state.onboardingNeeded && state.path === '/welcome') return '/dashboard'
   return null
 }

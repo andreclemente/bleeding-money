@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { boolean, date, doublePrecision, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, check, date, doublePrecision, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 export const categoryEnum = pgEnum('expense_category', ['electricity', 'telecom', 'bank', 'subscription', 'gym', 'insurance'])
 export const frequencyEnum = pgEnum('billing_frequency', ['monthly', 'quarterly', 'annual'])
@@ -7,6 +7,12 @@ export const statusEnum = pgEnum('finding_status', ['open', 'resolved', 'dismiss
 export const severityEnum = pgEnum('finding_severity', ['info', 'low', 'medium', 'high'])
 export const effortEnum = pgEnum('finding_effort', ['very_low', 'low', 'medium', 'high'])
 export const urgencyEnum = pgEnum('finding_urgency', ['low', 'medium', 'high'])
+export const spendCategoryEnum = pgEnum('spend_category', ['supermarket_total', 'fast_food_takeaway', 'alcohol', 'tobacco_nicotine', 'sweets_snacks_soft_drinks', 'other_discretionary'])
+export const spendScopeEnum = pgEnum('spend_scope', ['supermarket', 'outside_supermarket'])
+export const trackingIntentEnum = pgEnum('tracking_intent', ['track_only', 'maintain', 'reduce'])
+export const supermarketCoverageEnum = pgEnum('supermarket_coverage', ['food_only', 'includes_cleaning_hygiene', 'unknown'])
+export const spendAmountBasisEnum = pgEnum('spend_amount_basis', ['statement_or_receipts', 'calculated_estimate', 'memory_estimate'])
+export const spendStatusEnum = pgEnum('spend_status', ['estimated', 'complete'])
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull().unique(), passwordHash: text('password_hash'), ownerKey: text('owner_key').unique(), legacyClaimedAt: timestamp('legacy_claimed_at', { withTimezone: true }), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
@@ -14,6 +20,34 @@ export const users = pgTable('users', {
 export const sessions = pgTable('auth_sessions', {
   id: uuid('id').primaryKey(), userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), tokenHash: text('token_hash').notNull().unique(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(), revokedAt: timestamp('revoked_at', { withTimezone: true })
 }, table => [index('auth_sessions_user_expiry_idx').on(table.userId, table.expiresAt)])
+export const householdProfiles = pgTable('household_profiles', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }), adults: integer('adults').notNull(), dependents: integer('dependents').notNull(), country: text('country').notNull().default('PT'), effectiveAt: date('effective_at').notNull(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [check('household_profiles_country_pt_check', sql`${table.country} = 'PT'`), check('household_profiles_composition_check', sql`${table.adults} between 1 and 20 and ${table.dependents} between 0 and 20`)])
+export const monthlySpendPeriods = pgTable('monthly_spend_periods', {
+  id: uuid('id').primaryKey(), userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), month: date('month').notNull(), status: spendStatusEnum('status').notNull(), supermarketCoverage: supermarketCoverageEnum('supermarket_coverage').notNull(), amountBasis: spendAmountBasisEnum('amount_basis').notNull(), country: text('country').notNull().default('PT'), adults: integer('adults').notNull(), dependents: integer('dependents').notNull(), adultBand: text('adult_band').notNull(), dependentBand: text('dependent_band').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [
+  uniqueIndex('monthly_spend_user_month_idx').on(table.userId, table.month), index('monthly_spend_user_month_order_idx').on(table.userId, table.month),
+  check('monthly_spend_periods_country_pt_check', sql`${table.country} = 'PT'`),
+  check('monthly_spend_periods_composition_check', sql`${table.adults} between 1 and 20 and ${table.dependents} between 0 and 20`),
+  check('monthly_spend_periods_bands_check', sql`${table.adultBand} = case when ${table.adults} = 1 then '1' when ${table.adults} = 2 then '2' else '3plus' end and ${table.dependentBand} = case when ${table.dependents} = 0 then '0' when ${table.dependents} = 1 then '1' else '2plus' end`)
+])
+export const monthlySpendAmounts = pgTable('monthly_spend_amounts', {
+  id: uuid('id').primaryKey(), periodId: uuid('period_id').notNull().references(() => monthlySpendPeriods.id, { onDelete: 'cascade' }), category: spendCategoryEnum('category').notNull(), scope: spendScopeEnum('scope').notNull(), amountCents: integer('amount_cents').notNull(), trackingIntent: trackingIntentEnum('tracking_intent').notNull(), userTargetCents: integer('user_target_cents')
+}, table => [
+  uniqueIndex('monthly_spend_amount_category_scope_idx').on(table.periodId, table.category, table.scope),
+  check('monthly_spend_amount_nonnegative_check', sql`${table.amountCents} >= 0`),
+  check('monthly_spend_amount_target_intent_check', sql`(${table.trackingIntent} = 'reduce' and ${table.userTargetCents} is not null and ${table.userTargetCents} between 0 and ${table.amountCents}) or (${table.trackingIntent} <> 'reduce' and ${table.userTargetCents} is null)`)
+])
+export const spendCohortAggregates = pgTable('spend_cohort_aggregates', {
+  id: uuid('id').primaryKey(), category: spendCategoryEnum('category').notNull(), scope: spendScopeEnum('scope').notNull(), country: text('country').notNull(), adultBand: text('adult_band').notNull(), dependentBand: text('dependent_band').notNull(), supermarketCoverage: supermarketCoverageEnum('supermarket_coverage').notNull(), amountBasis: spendAmountBasisEnum('amount_basis').notNull(), status: spendStatusEnum('status').notNull(), windowStart: date('window_start').notNull(), windowEnd: date('window_end').notNull(), householdCount: integer('household_count').notNull(), p25Cents: integer('p25_cents').notNull(), medianCents: integer('median_cents').notNull(), p75Cents: integer('p75_cents').notNull(), source: text('source').notNull(), confidence: doublePrecision('confidence').notNull()
+}, table => [
+  index('spend_cohort_exact_match_idx').on(table.category, table.scope, table.country, table.adultBand, table.dependentBand, table.supermarketCoverage, table.amountBasis, table.status, table.windowEnd),
+  check('spend_cohort_country_pt_check', sql`${table.country} = 'PT'`),
+  check('spend_cohort_bands_check', sql`${table.adultBand} in ('1','2','3plus') and ${table.dependentBand} in ('0','1','2plus')`),
+  check('spend_cohort_nonnegative_check', sql`${table.householdCount} >= 0 and ${table.p25Cents} >= 0 and ${table.medianCents} >= 0 and ${table.p75Cents} >= 0`),
+  check('spend_cohort_percentiles_check', sql`${table.p25Cents} <= ${table.medianCents} and ${table.medianCents} <= ${table.p75Cents}`),
+  check('spend_cohort_confidence_check', sql`${table.confidence} between 0 and 1`)
+])
 export const recurringExpenses = pgTable('recurring_expenses', {
   id: uuid('id').primaryKey(), userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), category: categoryEnum('category').notNull(), provider: text('provider').notNull(), productName: text('product_name').notNull(), monthlyCostCents: integer('monthly_cost_cents').notNull(), billingFrequency: frequencyEnum('billing_frequency').notNull(), currency: text('currency').notNull().default('EUR'), contractStartDate: date('contract_start_date'), contractEndDate: date('contract_end_date'), commitmentEndDate: date('commitment_end_date'), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 }, table => [index('expenses_user_category_idx').on(table.userId, table.category)])

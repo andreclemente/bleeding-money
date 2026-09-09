@@ -45,12 +45,21 @@ const logout = async () => {
         </NuxtLink>
         <NuxtLink
           class="nav-link"
+          to="/spending"
+        >
+          <span
+            class="nav-index"
+            aria-hidden="true"
+          >02</span><span>Gastos mensais</span>
+        </NuxtLink>
+        <NuxtLink
+          class="nav-link"
           to="/expenses"
         >
           <span
             class="nav-index"
             aria-hidden="true"
-          >02</span><span>Despesas</span>
+          >03</span><span>Despesas</span>
         </NuxtLink>
         <NuxtLink
           class="nav-link"
@@ -59,7 +68,7 @@ const logout = async () => {
           <span
             class="nav-index"
             aria-hidden="true"
-          >03</span><span>Recomendações</span>
+          >04</span><span>Recomendações</span>
         </NuxtLink>
         <NuxtLink
           class="nav-link"
@@ -68,7 +77,7 @@ const logout = async () => {
           <span
             class="nav-index"
             aria-hidden="true"
-          >04</span><span>Como funciona</span>
+          >05</span><span>Como funciona</span>
         </NuxtLink>
       </nav>
       <div

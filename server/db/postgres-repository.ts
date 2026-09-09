@@ -2,6 +2,7 @@ import pg from 'pg'
 import { and, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { annualSaving } from '../../domain/savings'
+import { adultBand, amountBases, dependentBand, parseHouseholdInput, parseMonthlySpendInput, spendCategories, spendScopes, spendStatuses, supermarketCoverages, trackingIntents, type AnonymousCohortAggregate, type HouseholdInput, type HouseholdProfile, type MonthlySpendInput, type MonthlySpendPeriod } from '../../domain/spending'
 import type { ExpenseDetails, ExpenseSnapshot, MarketObservation, RecurringExpense, SavingAction, SavingsFinding } from '../../domain/types'
 import type { StoredOwner, StoredSession } from '../auth/types'
 import { parsePasswordHash } from '../auth/crypto'
@@ -27,6 +28,68 @@ const expenseFrom = (row: Record<string, unknown>): RecurringExpense => ({ id: S
 const snapshotFrom = (row: Record<string, unknown>): ExpenseSnapshot => ({ id: String(row.id), expenseId: String(row.expense_id), observedAt: dateFrom(row.observed_at)!, priceCents: Number(row.price_cents), plan: row.plan === null ? undefined : String(row.plan), properties: (row.properties || {}) as Record<string, unknown>, source: String(row.source) })
 const observationFrom = (row: Record<string, unknown>): MarketObservation => ({ id: String(row.id), category: row.category as MarketObservation['category'], provider: String(row.provider), productType: String(row.product_type), attributes: row.attributes as MarketObservation['attributes'], monthlyPriceCents: Number(row.monthly_price_cents), negotiated: Boolean(row.negotiated), country: String(row.country), observedAt: dateFrom(row.observed_at)!, source: String(row.source), confidence: Number(row.confidence) })
 const findingFrom = (row: Record<string, unknown>): SavingsFinding => ({ id: String(row.id), expenseId: String(row.expense_id), type: row.type as SavingsFinding['type'], title: String(row.title), description: String(row.description), estimatedMonthlySavingMinCents: Number(row.estimated_monthly_saving_min_cents), estimatedMonthlySavingMaxCents: Number(row.estimated_monthly_saving_max_cents), estimatedAnnualSavingMinCents: Number(row.estimated_annual_saving_min_cents), estimatedAnnualSavingMaxCents: Number(row.estimated_annual_saving_max_cents), confidence: Number(row.confidence), severity: row.severity as SavingsFinding['severity'], priority: Number(row.priority), effort: row.effort as SavingsFinding['effort'], urgency: row.urgency as SavingsFinding['urgency'], action: String(row.action), evidence: row.evidence as string[], status: row.status as SavingsFinding['status'], createdAt: isoFrom(row.created_at), resolvedAt: row.resolved_at ? isoFrom(row.resolved_at) : undefined, dismissedAt: row.dismissed_at ? isoFrom(row.dismissed_at) : undefined })
+const pgStoredError = () => new Error('Dados de gastos inválidos no PostgreSQL.')
+const pgEnum = <T extends string>(value: unknown, allowed: readonly T[]): T => {
+  if (typeof value !== 'string' || !allowed.includes(value as T)) throw pgStoredError()
+  return value as T
+}
+const pgInteger = (value: unknown, minimum = 0) => {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum || value > 2_147_483_647) throw pgStoredError()
+  return value
+}
+const pgFinite = (value: unknown, minimum: number, maximum: number) => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) throw pgStoredError()
+  return value
+}
+const pgDate = (value: unknown) => {
+  const parsed = dateFrom(value)
+  if (!parsed || !isIsoDate(parsed)) throw pgStoredError()
+  return parsed
+}
+const pgIso = (value: unknown) => {
+  if (!(value instanceof Date) && typeof value !== 'string') throw pgStoredError()
+  try { return isoFrom(value) } catch { throw pgStoredError() }
+}
+export const householdFrom = (row: Record<string, unknown>): HouseholdProfile => {
+  try {
+    const parsed = parseHouseholdInput({ adults: pgInteger(row.adults, 1), dependents: pgInteger(row.dependents), country: row.country })
+    return { userId: String(row.user_id), ...parsed, effectiveAt: pgDate(row.effective_at), updatedAt: pgIso(row.updated_at) }
+  } catch { throw pgStoredError() }
+}
+const spendAmountFrom = (row: Record<string, unknown>, joined = false): MonthlySpendPeriod['amounts'][number] => {
+  const prefix = joined ? 'amount_' : ''
+  const key = (name: string) => row[`${prefix}${name}`]
+  const target = key('user_target_cents')
+  return { id: String(key('id')), periodId: String(key('period_id')), category: pgEnum(key('category'), spendCategories), scope: pgEnum(key('scope'), spendScopes), amountCents: pgInteger(key('amount_cents')), trackingIntent: pgEnum(key('tracking_intent'), trackingIntents), ...(target === null || target === undefined ? {} : { userTargetCents: pgInteger(target) }) }
+}
+export const spendPeriodFrom = (row: Record<string, unknown>, amounts: MonthlySpendPeriod['amounts']): MonthlySpendPeriod => {
+  try {
+    if (row.country !== 'PT') throw pgStoredError()
+    const adults = pgInteger(row.adults, 1)
+    const dependents = pgInteger(row.dependents)
+    if (row.adult_band !== adultBand(adults) || row.dependent_band !== dependentBand(dependents)) throw pgStoredError()
+    const parsed = parseMonthlySpendInput({ month: pgDate(row.month), adults, dependents, status: pgEnum(row.status, spendStatuses), supermarketCoverage: pgEnum(row.supermarket_coverage, supermarketCoverages), amountBasis: pgEnum(row.amount_basis, amountBases), amounts: amounts.map(({ category, scope, amountCents, trackingIntent, userTargetCents }) => ({ category, scope, amountCents, trackingIntent, ...(userTargetCents === undefined ? {} : { userTargetCents }) })) })
+    const id = String(row.id)
+    if (amounts.some(amount => amount.periodId !== id)) throw pgStoredError()
+    return { id, userId: String(row.user_id), ...parsed, country: 'PT', adultBand: adultBand(adults), dependentBand: dependentBand(dependents), createdAt: pgIso(row.created_at), updatedAt: pgIso(row.updated_at), amounts }
+  } catch { throw pgStoredError() }
+}
+export const cohortFrom = (row: Record<string, unknown>): AnonymousCohortAggregate => {
+  try {
+    if (row.country !== 'PT') throw pgStoredError()
+    const p25Cents = pgInteger(row.p25_cents)
+    const medianCents = pgInteger(row.median_cents)
+    const p75Cents = pgInteger(row.p75_cents)
+    if (p25Cents > medianCents || medianCents > p75Cents) throw pgStoredError()
+    const adultBandValue = pgEnum(row.adult_band, ['1', '2', '3plus'] as const)
+    const dependentBandValue = pgEnum(row.dependent_band, ['0', '1', '2plus'] as const)
+    const windowStart = pgDate(row.window_start)
+    const windowEnd = pgDate(row.window_end)
+    if (windowStart > windowEnd) throw pgStoredError()
+    const source = typeof row.source === 'string' && row.source.trim() ? row.source : (() => { throw pgStoredError() })()
+    return { id: String(row.id), category: pgEnum(row.category, spendCategories), scope: pgEnum(row.scope, spendScopes), country: 'PT', adultBand: adultBandValue, dependentBand: dependentBandValue, supermarketCoverage: pgEnum(row.supermarket_coverage, supermarketCoverages), amountBasis: pgEnum(row.amount_basis, amountBases), status: pgEnum(row.status, spendStatuses), windowStart, windowEnd, householdCount: pgInteger(row.household_count), p25Cents, medianCents, p75Cents, source, confidence: pgFinite(row.confidence, 0, 1) }
+  } catch { throw pgStoredError() }
+}
 const expenseSql = 'select e.*, ed.contracted_power_kva, ed.tariff_type, ed.price_per_kwh_cents, ed.power_price_per_day_cents, ed.annual_consumption_kwh, ed.max_historical_power_kva, td.connection_type, td.download_speed_mbps, td.upload_speed_mbps, td.mobile_data_gb, td.mobile_lines, td.tv_included, bd.account_maintenance_fee_cents, bd.card_annual_fee_cents, bd.transfer_fees_cents, sd.plan, sd.last_used_at, sd.usage_frequency from recurring_expenses e left join electricity_details ed on ed.expense_id=e.id left join telecom_details td on td.expense_id=e.id left join bank_details bd on bd.expense_id=e.id left join subscription_details sd on sd.expense_id=e.id'
 const snapshotProperties = (expense: RecurringExpense) => ({ provider: expense.provider, details: expense.details, contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate })
 const relevantState = (expense: RecurringExpense) => JSON.stringify({ provider: expense.provider, productName: expense.productName, monthlyCostCents: expense.monthlyCostCents, currency: expense.currency, contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate, details: expense.details })
@@ -189,5 +252,56 @@ export class PostgresRepository implements PoupancasRepository {
   async listActions(userId: string) {
     const rows = (await this.pool.query('select a.* from saving_actions a join savings_findings f on f.id=a.finding_id join recurring_expenses e on e.id=f.expense_id where e.user_id=$1 order by a.action_date desc', [userId])).rows
     return rows.map(row => ({ id: String(row.id), findingId: String(row.finding_id), previousCostCents: Number(row.previous_cost_cents), newCostCents: Number(row.new_cost_cents), actionDate: dateFrom(row.action_date)!, annualSavingCents: Number(row.annual_saving_cents), createdAt: isoFrom(row.created_at) }))
+  }
+  async getHouseholdProfile(userId: string) {
+    const row = (await this.pool.query('select * from household_profiles where user_id=$1', [userId])).rows[0]
+    return row ? householdFrom(row) : null
+  }
+  async upsertHouseholdProfile(userId: string, raw: HouseholdInput) {
+    const input = parseHouseholdInput(raw)
+    const row = (await this.pool.query("insert into household_profiles (user_id,adults,dependents,country,effective_at) values ($1,$2,$3,'PT',current_date) on conflict (user_id) do update set adults=excluded.adults,dependents=excluded.dependents,updated_at=now() returning *", [userId, input.adults, input.dependents])).rows[0]
+    return householdFrom(row)
+  }
+  private async listMonthlySpendPeriodsWith(db: Queryable, userId: string, periodId?: string) {
+    const rows = (await db.query(`select p.*,
+      a.id as amount_id,a.period_id as amount_period_id,a.category as amount_category,a.scope as amount_scope,
+      a.amount_cents as amount_amount_cents,a.tracking_intent as amount_tracking_intent,a.user_target_cents as amount_user_target_cents
+      from monthly_spend_periods p left join monthly_spend_amounts a on a.period_id=p.id
+      where p.user_id=$1${periodId ? ' and p.id=$2' : ''} order by p.month desc,a.category,a.scope`, periodId ? [userId, periodId] : [userId])).rows
+    const byPeriod = new Map<string, MonthlySpendPeriod['amounts']>()
+    const periodRows = new Map<string, Record<string, unknown>>()
+    for (const row of rows) {
+      const id = String(row.id)
+      periodRows.set(id, row)
+      if (row.amount_id !== null) {
+        const amount = spendAmountFrom(row, true)
+        const values = byPeriod.get(id) || []
+        values.push(amount)
+        byPeriod.set(id, values)
+      }
+    }
+    return [...periodRows.values()].map(row => spendPeriodFrom(row, byPeriod.get(String(row.id)) || []))
+  }
+  async listMonthlySpendPeriods(userId: string) { return this.listMonthlySpendPeriodsWith(this.pool, userId) }
+  async upsertMonthlySpendPeriod(userId: string, raw: MonthlySpendInput) {
+    const input = parseMonthlySpendInput(raw)
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      const periodRow = (await client.query("insert into monthly_spend_periods (id,user_id,month,status,supermarket_coverage,amount_basis,country,adults,dependents,adult_band,dependent_band) values ($1,$2,$3,$4,$5,$6,'PT',$7,$8,$9,$10) on conflict (user_id,month) do update set status=excluded.status,supermarket_coverage=excluded.supermarket_coverage,amount_basis=excluded.amount_basis,country=excluded.country,adults=excluded.adults,dependents=excluded.dependents,adult_band=excluded.adult_band,dependent_band=excluded.dependent_band,updated_at=now() returning *", [crypto.randomUUID(), userId, input.month, input.status, input.supermarketCoverage, input.amountBasis, input.adults, input.dependents, adultBand(input.adults), dependentBand(input.dependents)])).rows[0]
+      const id = String(periodRow.id)
+      await client.query('delete from monthly_spend_amounts where period_id=$1', [id])
+      for (const amount of input.amounts) await client.query('insert into monthly_spend_amounts (id,period_id,category,scope,amount_cents,tracking_intent,user_target_cents) values ($1,$2,$3,$4,$5,$6,$7)', [crypto.randomUUID(), id, amount.category, amount.scope, amount.amountCents, amount.trackingIntent, amount.userTargetCents])
+      const result = (await this.listMonthlySpendPeriodsWith(client, userId, id))[0]
+      if (!result) throw new Error('Período mensal não encontrado após gravação')
+      await client.query('commit')
+      return result
+    } catch (error) {
+      await client.query('rollback')
+      throw error
+    } finally { client.release() }
+  }
+  async listAnonymousSpendCohorts() {
+    return (await this.pool.query('select * from spend_cohort_aggregates order by window_end desc')).rows.map(cohortFrom)
   }
 }

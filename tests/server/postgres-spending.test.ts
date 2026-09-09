@@ -1,0 +1,49 @@
+import { readFile } from 'node:fs/promises'
+import { describe, expect, it } from 'vitest'
+import { cohortFrom, householdFrom, spendPeriodFrom } from '../../server/db/postgres-repository'
+
+const periodRow = {
+  id: '10000000-0000-4000-8000-000000000010', user_id: '10000000-0000-4000-8000-000000000001',
+  month: '2026-08-01', status: 'complete', supermarket_coverage: 'food_only', amount_basis: 'statement_or_receipts',
+  country: 'PT', adults: 2, dependents: 1, adult_band: '2', dependent_band: '1',
+  created_at: '2026-08-31T10:00:00Z', updated_at: '2026-08-31T10:00:00Z'
+}
+const amount = { id: '10000000-0000-4000-8000-000000000011', periodId: periodRow.id, category: 'supermarket_total' as const, scope: 'supermarket' as const, amountCents: 50000, trackingIntent: 'track_only' as const }
+const cohortRow = { id: '10000000-0000-4000-8000-000000000012', category: 'supermarket_total', scope: 'supermarket', country: 'PT', adult_band: '2', dependent_band: '1', supermarket_coverage: 'food_only', amount_basis: 'statement_or_receipts', status: 'complete', window_start: '2026-01-01', window_end: '2026-08-31', household_count: 10, p25_cents: 30000, median_cents: 40000, p75_cents: 50000, source: 'fixture', confidence: 0.8 }
+
+describe('paridade PostgreSQL fail-closed', () => {
+  it('rejeita país, composição, bandas e montantes/intenções armazenados inválidos', () => {
+    expect(() => householdFrom({ user_id: periodRow.user_id, adults: 2, dependents: 1, country: 'ES', effective_at: '2026-01-01', updated_at: periodRow.updated_at })).toThrow(/PostgreSQL/i)
+    expect(() => spendPeriodFrom({ ...periodRow, country: 'ES' }, [amount])).toThrow(/PostgreSQL/i)
+    expect(() => spendPeriodFrom({ ...periodRow, adult_band: '1' }, [amount])).toThrow(/PostgreSQL/i)
+    expect(() => spendPeriodFrom(periodRow, [{ ...amount, amountCents: -1 }])).toThrow(/PostgreSQL/i)
+    expect(() => spendPeriodFrom(periodRow, [{ ...amount, trackingIntent: 'reduce' }])).toThrow(/PostgreSQL/i)
+  })
+
+  it('rejeita coortes com país, contagem, percentis ou confiança inválidos', () => {
+    expect(() => cohortFrom({ ...cohortRow, country: 'ES' })).toThrow(/PostgreSQL/i)
+    expect(() => cohortFrom({ ...cohortRow, household_count: -1 })).toThrow(/PostgreSQL/i)
+    expect(() => cohortFrom({ ...cohortRow, median_cents: 60000 })).toThrow(/PostgreSQL/i)
+    expect(() => cohortFrom({ ...cohortRow, confidence: 2 })).toThrow(/PostgreSQL/i)
+    expect(() => cohortFrom({ ...cohortRow, amount_basis: 'guess' })).toThrow(/PostgreSQL/i)
+    expect(() => cohortFrom({ ...cohortRow, status: 'draft' })).toThrow(/PostgreSQL/i)
+    expect(() => cohortFrom({ ...cohortRow, scope: 'everywhere' })).toThrow(/PostgreSQL/i)
+  })
+
+  it('migra dimensões exatas e constraints antes de expor coortes', async () => {
+    const migration = await readFile(new URL('../../drizzle/0003_dazzling_lucky_pierre.sql', import.meta.url), 'utf8')
+    expect(migration).toMatch(/spend_cohort_aggregates[\s\S]+"scope" "spend_scope" not null/i)
+    expect(migration).toMatch(/spend_cohort_aggregates[\s\S]+"amount_basis" "spend_amount_basis" not null/i)
+    expect(migration).toMatch(/spend_cohort_aggregates[\s\S]+"status" "spend_status" not null/i)
+    expect(migration).toMatch(/spend_cohort_exact_match_idx[\s\S]+"category","scope","country","adult_band","dependent_band","supermarket_coverage","amount_basis","status","window_end"/i)
+    expect(migration).toMatch(/monthly_spend_amount_target_intent_check/i)
+    expect(migration).toMatch(/monthly_spend_periods_bands_check/i)
+  })
+
+  it('usa upsert atómico e lê períodos e montantes num único snapshot SQL', async () => {
+    const source = await readFile(new URL('../../server/db/postgres-repository.ts', import.meta.url), 'utf8')
+    expect(source).toMatch(/insert into monthly_spend_periods[\s\S]+on conflict \(user_id,month\) do update[\s\S]+returning \*/i)
+    expect(source).toMatch(/from monthly_spend_periods p left join monthly_spend_amounts a/i)
+    expect(source).not.toMatch(/Promise\.all\(\[\s*this\.pool\.query\('select \* from monthly_spend_periods/i)
+  })
+})

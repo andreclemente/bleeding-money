@@ -45,6 +45,7 @@ describe('guardas de rota', () => {
     [{ path: '/login', authenticated: true, registrationAvailable: false, onboardingNeeded: true }, '/welcome'],
     [{ path: '/register', authenticated: true, registrationAvailable: false, onboardingNeeded: false }, '/dashboard'],
     [{ path: '/dashboard', authenticated: true, registrationAvailable: false, onboardingNeeded: true }, '/welcome'],
+    [{ path: '/spending', authenticated: true, registrationAvailable: false, onboardingNeeded: true }, null],
     [{ path: '/how-it-works', authenticated: false, registrationAvailable: false, onboardingNeeded: false }, null]
   ])('resolve %o para %s', (state, expected) => {
     expect(routeGuardDestination(state)).toBe(expected)

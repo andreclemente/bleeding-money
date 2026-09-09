@@ -36,6 +36,12 @@ const priorityFindings = computed<SavingsFinding[]>(() => store.dashboard?.prior
       <p class="monitor-context">
         <strong>{{ store.dashboard.expenses.length }} {{ store.dashboard.expenses.length === 1 ? 'despesa vigiada' : 'despesas vigiadas' }}</strong><span>Última análise: {{ date(store.dashboard.lastAnalysisAt) }}</span><span>{{ money(store.dashboard.monthlyExpensesCents) }}/mês confirmados</span>
       </p>
+      <NuxtLink
+        class="monthly-spending-callout"
+        to="/spending"
+      >
+        <span><small>Nova radiografia mensal</small><strong>Quanto saiu no supermercado e nos gastos do dia a dia?</strong><span>Regista um mês real, escolhe os teus próprios limites e acompanha o histórico sem estimativas inventadas.</span></span><b>Começar →</b>
+      </NuxtLink>
       <section
         class="saving-overview"
         aria-labelledby="potential-title"

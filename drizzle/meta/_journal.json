@@ -22,6 +22,13 @@
       "when": 1788861134574,
       "tag": "0002_hard_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788936282103,
+      "tag": "0003_dazzling_lucky_pierre",
+      "breakpoints": true
     }
   ]
 }
