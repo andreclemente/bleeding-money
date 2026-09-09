@@ -46,4 +46,17 @@ describe('paridade PostgreSQL fail-closed', () => {
     expect(source).toMatch(/from monthly_spend_periods p left join monthly_spend_amounts a/i)
     expect(source).not.toMatch(/Promise\.all\(\[\s*this\.pool\.query\('select \* from monthly_spend_periods/i)
   })
+
+  it('migra categorias e âmbito de habitação como contexto neutro', async () => {
+    const migration = await readFile(new URL('../../drizzle/0004_housing_context.sql', import.meta.url), 'utf8')
+    const snapshot = await readFile(new URL('../../drizzle/meta/0004_snapshot.json', import.meta.url), 'utf8')
+    expect(migration).toMatch(/alter type "public"\."spend_category" add value 'rent'/i)
+    expect(migration).toMatch(/alter type "public"\."spend_category" add value 'mortgage_payment'/i)
+    expect(migration).toMatch(/alter type "public"\."spend_category" add value 'condominium_fee'/i)
+    expect(migration).toMatch(/alter type "public"\."spend_scope" add value 'housing'/i)
+    expect(migration).toMatch(/monthly_spend_amount_housing_context_check/i)
+    expect(migration).toMatch(/"category"::text in \('rent','mortgage_payment','condominium_fee'\)/i)
+    expect(migration).toMatch(/"scope"::text = 'housing'/i)
+    expect(snapshot).toMatch(/monthly_spend_amount_housing_context_check/i)
+  })
 })

@@ -53,7 +53,23 @@ describe('validação e aritmética de gastos mensais', () => {
 
   it('evita dupla contagem entre supermercado e parcelas internas', () => {
     const parsed = parseMonthlySpendInput(input())
-    expect(calculateSpendTotals(parsed.amounts)).toEqual({ supermarketCents: 50000, outsideCents: 2000, grandTotalCents: 52000, annualizedCents: 624000, discretionaryDeclaredCents: 5000 })
+    expect(calculateSpendTotals(parsed.amounts)).toEqual({ supermarketCents: 50000, outsideCents: 2000, housingCents: 0, grandTotalCents: 52000, annualizedCents: 624000, discretionaryDeclaredCents: 5000 })
+  })
+
+  it('trata habitação como contexto factual sem a classificar como fuga', () => {
+    const parsed = parseMonthlySpendInput({
+      ...input(),
+      amounts: [
+        ...input().amounts,
+        { category: 'mortgage_payment', scope: 'housing', amountCents: 72500, trackingIntent: 'track_only' },
+        { category: 'condominium_fee', scope: 'housing', amountCents: 4500, trackingIntent: 'track_only' }
+      ]
+    })
+
+    expect(calculateSpendTotals(parsed.amounts)).toEqual({ supermarketCents: 50000, outsideCents: 2000, housingCents: 77000, grandTotalCents: 129000, annualizedCents: 1548000, discretionaryDeclaredCents: 5000 })
+    expect(calculateMoneyAtRisk(parsed.amounts).monthlyCents).toBe(1000)
+    expect(() => parseMonthlySpendInput({ ...input(), amounts: [...input().amounts, { category: 'rent', scope: 'housing', amountCents: 80000, trackingIntent: 'reduce', userTargetCents: 70000 }] })).toThrow(/habitação/i)
+    expect(() => parseMonthlySpendInput({ ...input(), amounts: [...input().amounts, { category: 'rent', scope: 'outside_supermarket', amountCents: 80000, trackingIntent: 'track_only' }] })).toThrow(/habitação/i)
   })
 
   it('rejeita mês, dinheiro, alvos e sobreposição inválidos', () => {
@@ -99,13 +115,18 @@ describe('validação e aritmética de gastos mensais', () => {
     const single = buildSpendChartData([one])
 
     expect(single.timeline).toMatchObject({ state: 'insufficient_for_trend', missingComparableMonths: 3, comparableMedianCents: null })
-    expect(single.timeline.points).toEqual([{ month: '2026-08-01', supermarketCents: 50000, otherCents: 8000, highlighted: true }])
+    expect(single.timeline.points).toEqual([{ month: '2026-08-01', supermarketCents: 50000, otherCents: 8000, housingCents: 0, highlighted: true }])
     expect(single.breakdown.bars.map(item => [item.key, item.amountCents])).toEqual([
       ['supermarket_remainder', 45000],
       ['fast_food_takeaway', 8000],
       ['sweets_snacks_soft_drinks', 5000]
     ])
     expect(single.breakdown.totalCents).toBe(58000)
+
+    one.amounts.push({ id: 'housing', periodId: one.id, category: 'rent', scope: 'housing', amountCents: 80000, trackingIntent: 'track_only' })
+    const withHousing = buildSpendChartData([one])
+    expect(withHousing.timeline.points[0]).toMatchObject({ housingCents: 80000 })
+    expect(withHousing.breakdown.bars).toContainEqual({ key: 'rent', amountCents: 80000 })
 
     const history = ['2026-05-01', '2026-06-01', '2026-07-01'].map(month => period(month, 40000))
     const complete = buildSpendChartData([...history.reverse(), one])

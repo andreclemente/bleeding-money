@@ -1,10 +1,13 @@
-export const spendCategories = ['supermarket_total', 'fast_food_takeaway', 'alcohol', 'tobacco_nicotine', 'sweets_snacks_soft_drinks', 'other_discretionary'] as const
-export const spendScopes = ['supermarket', 'outside_supermarket'] as const
+export const housingCategories = ['rent', 'mortgage_payment', 'condominium_fee'] as const
+export const auditableSpendCategories = ['supermarket_total', 'fast_food_takeaway', 'alcohol', 'tobacco_nicotine', 'sweets_snacks_soft_drinks', 'other_discretionary'] as const
+export const spendCategories = [...auditableSpendCategories, ...housingCategories] as const
+export const spendScopes = ['supermarket', 'outside_supermarket', 'housing'] as const
 export const trackingIntents = ['track_only', 'maintain', 'reduce'] as const
 export const supermarketCoverages = ['food_only', 'includes_cleaning_hygiene', 'unknown'] as const
 export const amountBases = ['statement_or_receipts', 'calculated_estimate', 'memory_estimate'] as const
 export const spendStatuses = ['estimated', 'complete'] as const
 export type SpendCategory = typeof spendCategories[number]
+export type HousingCategory = typeof housingCategories[number]
 export type SpendScope = typeof spendScopes[number]
 export type TrackingIntent = typeof trackingIntents[number]
 export type SupermarketCoverage = typeof supermarketCoverages[number]
@@ -50,6 +53,7 @@ const currentCalendarMonth = (now: Date) => {
 }
 export const adultBand = (value: number): AdultBand => value === 1 ? '1' : value === 2 ? '2' : '3plus'
 export const dependentBand = (value: number): DependentBand => value === 0 ? '0' : value === 1 ? '1' : '2plus'
+export const isHousingCategory = (value: SpendCategory): value is HousingCategory => (housingCategories as readonly string[]).includes(value)
 
 export const parseHouseholdInput = (value: unknown): HouseholdInput => {
   const row = object(value)
@@ -73,6 +77,8 @@ export const parseMonthlySpendInput = (value: unknown, now = new Date()): Monthl
     const amountCents = integer(amount.amountCents, 0, MAX_CENTS, 'Montante')
     const trackingIntent = enumValue(amount.trackingIntent, trackingIntents, 'Intenção')
     if (category === 'supermarket_total' && scope !== 'supermarket') throw new Error('O total de supermercado tem de usar o âmbito supermercado')
+    if (isHousingCategory(category) && (scope !== 'housing' || trackingIntent !== 'track_only' || amount.userTargetCents !== undefined)) throw new Error('Os custos de habitação são apenas contexto factual, sem limites ou classificação de desperdício')
+    if (!isHousingCategory(category) && scope === 'housing') throw new Error('O âmbito habitação é exclusivo dos custos de habitação')
     if (category !== 'supermarket_total' && amountCents === 0) throw new Error('Omite categorias sem montante')
     const userTargetCents = amount.userTargetCents === undefined ? undefined : integer(amount.userTargetCents, 0, amountCents, 'Limite escolhido')
     if (trackingIntent !== 'reduce' && userTargetCents !== undefined) throw new Error('O limite escolhido só é válido para reduzir')
@@ -99,9 +105,10 @@ export const parseMonthlySpendInput = (value: unknown, now = new Date()): Monthl
 export const calculateSpendTotals = (amounts: MonthlySpendInput['amounts']) => {
   const supermarketCents = amounts.find(item => item.category === 'supermarket_total' && item.scope === 'supermarket')?.amountCents || 0
   const outsideCents = amounts.filter(item => item.scope === 'outside_supermarket').reduce((sum, item) => sum + item.amountCents, 0)
-  const discretionaryDeclaredCents = amounts.filter(item => item.category !== 'supermarket_total').reduce((sum, item) => sum + item.amountCents, 0)
-  const grandTotalCents = supermarketCents + outsideCents
-  return { supermarketCents, outsideCents, grandTotalCents, annualizedCents: grandTotalCents * 12, discretionaryDeclaredCents }
+  const housingCents = amounts.filter(item => item.scope === 'housing').reduce((sum, item) => sum + item.amountCents, 0)
+  const discretionaryDeclaredCents = amounts.filter(item => item.category !== 'supermarket_total' && !isHousingCategory(item.category)).reduce((sum, item) => sum + item.amountCents, 0)
+  const grandTotalCents = supermarketCents + outsideCents + housingCents
+  return { supermarketCents, outsideCents, housingCents, grandTotalCents, annualizedCents: grandTotalCents * 12, discretionaryDeclaredCents }
 }
 
 export interface MoneyAtRisk {
@@ -138,7 +145,7 @@ export const buildSpendChartData = (periods: MonthlySpendPeriod[]) => {
   const latest = chronological.at(-1)
   const points = chronological.map(period => {
     const totals = calculateSpendTotals(period.amounts)
-    return { month: period.month, supermarketCents: totals.supermarketCents, otherCents: totals.outsideCents, highlighted: period.id === latest?.id }
+    return { month: period.month, supermarketCents: totals.supermarketCents, otherCents: totals.outsideCents, housingCents: totals.housingCents, highlighted: period.id === latest?.id }
   })
   if (!latest) return {
     timeline: { state: 'empty' as const, missingComparableMonths: 3, comparableMedianCents: null, points },
@@ -167,6 +174,7 @@ const insight = (kind: SpendInsightKind, category: SpendCategory, confidence: nu
 
 export class OwnHistorySpendAnalyzer {
   analyze(latest: MonthlySpendPeriod, periods: MonthlySpendPeriod[], category: SpendCategory): SpendInsight | null {
+    if (isHousingCategory(category)) return null
     if (category !== 'supermarket_total' && !latest.amounts.some(amount => amount.category === category)) return null
     const comparable = periods.filter(item => item.month < latest.month && item.supermarketCoverage === latest.supermarketCoverage && item.amountBasis === latest.amountBasis && (category === 'supermarket_total' || item.amounts.some(amount => amount.category === category)))
     if (comparable.length < 3) return insight('CHECK_UNAVAILABLE', category, 1, 'Histórico próprio: ainda sem dados suficientes; são necessários 3 meses comparáveis.', { sampleSize: comparable.length, requiredSampleSize: 3, missingMonths: 3 - comparable.length })
@@ -191,6 +199,7 @@ export class UserTargetGapAnalyzer {
 
 export class CohortSpendAnalyzer {
   analyze(latest: MonthlySpendPeriod, category: SpendCategory, aggregates: AnonymousCohortAggregate[], now = new Date()): SpendInsight | null {
+    if (isHousingCategory(category)) return null
     if (category !== 'supermarket_total' && !latest.amounts.some(amount => amount.category === category)) return null
     const scopes = [...new Set(latest.amounts.filter(amount => amount.category === category).map(amount => amount.scope))]
     const cutoff = new Date(now)

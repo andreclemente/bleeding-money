@@ -1,0 +1,5 @@
+ALTER TYPE "public"."spend_category" ADD VALUE 'rent';--> statement-breakpoint
+ALTER TYPE "public"."spend_category" ADD VALUE 'mortgage_payment';--> statement-breakpoint
+ALTER TYPE "public"."spend_category" ADD VALUE 'condominium_fee';--> statement-breakpoint
+ALTER TYPE "public"."spend_scope" ADD VALUE 'housing';--> statement-breakpoint
+ALTER TABLE "monthly_spend_amounts" ADD CONSTRAINT "monthly_spend_amount_housing_context_check" CHECK (("monthly_spend_amounts"."category"::text in ('rent','mortgage_payment','condominium_fee') and "monthly_spend_amounts"."scope"::text = 'housing' and "monthly_spend_amounts"."tracking_intent" = 'track_only' and "monthly_spend_amounts"."user_target_cents" is null) or ("monthly_spend_amounts"."category"::text not in ('rent','mortgage_payment','condominium_fee') and "monthly_spend_amounts"."scope"::text <> 'housing'));

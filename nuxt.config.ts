@@ -16,6 +16,7 @@ export default defineNuxtConfig({
     }
   },
   build: { transpile: ['vuetify'] },
+  nitro: { output: { dir: process.env.NITRO_OUTPUT_DIR || '.output' } },
   vite: { plugins: [vuetify({ autoImport: true })] },
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL || '',

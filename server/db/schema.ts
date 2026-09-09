@@ -7,8 +7,8 @@ export const statusEnum = pgEnum('finding_status', ['open', 'resolved', 'dismiss
 export const severityEnum = pgEnum('finding_severity', ['info', 'low', 'medium', 'high'])
 export const effortEnum = pgEnum('finding_effort', ['very_low', 'low', 'medium', 'high'])
 export const urgencyEnum = pgEnum('finding_urgency', ['low', 'medium', 'high'])
-export const spendCategoryEnum = pgEnum('spend_category', ['supermarket_total', 'fast_food_takeaway', 'alcohol', 'tobacco_nicotine', 'sweets_snacks_soft_drinks', 'other_discretionary'])
-export const spendScopeEnum = pgEnum('spend_scope', ['supermarket', 'outside_supermarket'])
+export const spendCategoryEnum = pgEnum('spend_category', ['supermarket_total', 'fast_food_takeaway', 'alcohol', 'tobacco_nicotine', 'sweets_snacks_soft_drinks', 'other_discretionary', 'rent', 'mortgage_payment', 'condominium_fee'])
+export const spendScopeEnum = pgEnum('spend_scope', ['supermarket', 'outside_supermarket', 'housing'])
 export const trackingIntentEnum = pgEnum('tracking_intent', ['track_only', 'maintain', 'reduce'])
 export const supermarketCoverageEnum = pgEnum('supermarket_coverage', ['food_only', 'includes_cleaning_hygiene', 'unknown'])
 export const spendAmountBasisEnum = pgEnum('spend_amount_basis', ['statement_or_receipts', 'calculated_estimate', 'memory_estimate'])
@@ -36,7 +36,8 @@ export const monthlySpendAmounts = pgTable('monthly_spend_amounts', {
 }, table => [
   uniqueIndex('monthly_spend_amount_category_scope_idx').on(table.periodId, table.category, table.scope),
   check('monthly_spend_amount_nonnegative_check', sql`${table.amountCents} >= 0`),
-  check('monthly_spend_amount_target_intent_check', sql`(${table.trackingIntent} = 'reduce' and ${table.userTargetCents} is not null and ${table.userTargetCents} between 0 and ${table.amountCents}) or (${table.trackingIntent} <> 'reduce' and ${table.userTargetCents} is null)`)
+  check('monthly_spend_amount_target_intent_check', sql`(${table.trackingIntent} = 'reduce' and ${table.userTargetCents} is not null and ${table.userTargetCents} between 0 and ${table.amountCents}) or (${table.trackingIntent} <> 'reduce' and ${table.userTargetCents} is null)`),
+  check('monthly_spend_amount_housing_context_check', sql`${table.category}::text in ('rent','mortgage_payment','condominium_fee') and ${table.scope}::text = 'housing' and ${table.trackingIntent} = 'track_only' and ${table.userTargetCents} is null or ${table.category}::text not in ('rent','mortgage_payment','condominium_fee') and ${table.scope}::text <> 'housing'`)
 ])
 export const spendCohortAggregates = pgTable('spend_cohort_aggregates', {
   id: uuid('id').primaryKey(), category: spendCategoryEnum('category').notNull(), scope: spendScopeEnum('scope').notNull(), country: text('country').notNull(), adultBand: text('adult_band').notNull(), dependentBand: text('dependent_band').notNull(), supermarketCoverage: supermarketCoverageEnum('supermarket_coverage').notNull(), amountBasis: spendAmountBasisEnum('amount_basis').notNull(), status: spendStatusEnum('status').notNull(), windowStart: date('window_start').notNull(), windowEnd: date('window_end').notNull(), householdCount: integer('household_count').notNull(), p25Cents: integer('p25_cents').notNull(), medianCents: integer('median_cents').notNull(), p75Cents: integer('p75_cents').notNull(), source: text('source').notNull(), confidence: doublePrecision('confidence').notNull()

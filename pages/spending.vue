@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { calculateMoneyAtRisk, type HouseholdProfile, type MonthlySpendAmount, type MonthlySpendPeriod, type SpendCategory, type SpendScope } from '../domain/spending'
+import { calculateMoneyAtRisk, type HouseholdProfile, type HousingCategory, type MonthlySpendAmount, type MonthlySpendPeriod, type SpendCategory, type SpendScope } from '../domain/spending'
 
 useHead({ title: 'Gastos mensais — Poupanças' })
 
@@ -9,11 +9,12 @@ interface Overview {
   moneyAtRisk: { monthlyCents: number, annualCents: number, currency: 'EUR', isEstimate: true, basis: 'user_declared_targets' }
   comparisons: Array<{ category: SpendCategory, ownHistory: { kind: string, reason: string, evidence: { missingMonths?: number } } | null, anonymousCohort: { kind: string, reason: string } | null }>
   charts: {
-    timeline: { state: 'empty' | 'insufficient_for_trend' | 'comparable_baseline', missingComparableMonths: number, comparableMedianCents: number | null, points: Array<{ month: string, supermarketCents: number, otherCents: number, highlighted: boolean }> }
+    timeline: { state: 'empty' | 'insufficient_for_trend' | 'comparable_baseline', missingComparableMonths: number, comparableMedianCents: number | null, points: Array<{ month: string, supermarketCents: number, otherCents: number, housingCents: number, highlighted: boolean }> }
     breakdown: { month: string | null, totalCents: number, bars: Array<{ key: string, amountCents: number }> }
   }
 }
-interface CategoryForm { category: Exclude<SpendCategory, 'supermarket_total'>, label: string, example: string, selected: boolean, amount: string, reduce: boolean, target: string, scope: SpendScope, fixedScope?: boolean }
+interface CategoryForm { category: Exclude<SpendCategory, 'supermarket_total' | HousingCategory>, label: string, example: string, selected: boolean, amount: string, reduce: boolean, target: string, scope: SpendScope, fixedScope?: boolean }
+interface HousingForm { category: HousingCategory, label: string, selected: boolean, amount: string }
 
 const requestFetch = useRequestFetch()
 const overview = ref<Overview>(await requestFetch<Overview>('/api/spending'))
@@ -40,6 +41,11 @@ const categories = reactive([
   { category: 'sweets_snacks_soft_drinks', label: 'Doces, snacks e refrigerantes', example: 'Ex.: bolachas, batatas fritas, chocolates e bebidas', selected: false, amount: '', reduce: false, target: '', scope: 'supermarket' },
   { category: 'other_discretionary', label: 'Outros gastos que escolheste rever', example: 'Ex.: pequenas compras não essenciais que não cabem acima', selected: false, amount: '', reduce: false, target: '', scope: 'outside_supermarket' }
 ]) as CategoryForm[]
+const housingCosts = reactive([
+  { category: 'rent', label: 'Renda', selected: false, amount: '' },
+  { category: 'mortgage_payment', label: 'Prestação da casa', selected: false, amount: '' },
+  { category: 'condominium_fee', label: 'Condomínio', selected: false, amount: '' }
+]) as HousingForm[]
 
 const cents = (value: string) => {
   const normalized = value.trim().replace(',', '.')
@@ -55,6 +61,7 @@ const amountDraft = computed(() => {
   const amounts: Array<Omit<MonthlySpendAmount, 'id' | 'periodId'>> = []
   if (supermarket.amount) amounts.push({ category: 'supermarket_total', scope: 'supermarket', amountCents: cents(supermarket.amount), trackingIntent: supermarket.reduce ? 'reduce' : 'track_only', ...(supermarket.reduce && supermarket.target ? { userTargetCents: cents(supermarket.target) } : {}) })
   for (const item of categories.filter(item => item.selected && item.amount)) amounts.push({ category: item.category, scope: item.scope, amountCents: cents(item.amount), trackingIntent: item.reduce ? 'reduce' : 'track_only', ...(item.reduce && item.target ? { userTargetCents: cents(item.target) } : {}) })
+  for (const item of housingCosts.filter(item => item.selected && item.amount)) amounts.push({ category: item.category, scope: 'housing', amountCents: cents(item.amount), trackingIntent: 'track_only' })
   return amounts
 })
 const riskPreview = computed(() => {
@@ -65,7 +72,7 @@ const riskPreview = computed(() => {
   }
 })
 const existingPeriod = computed(() => overview.value.periods.find((item: MonthlySpendPeriod) => item.month.slice(0, 7) === month.value))
-const timelineMaximum = computed(() => Math.max(1, ...overview.value.charts.timeline.points.map((item: { supermarketCents: number, otherCents: number }) => item.supermarketCents + item.otherCents)))
+const timelineMaximum = computed(() => Math.max(1, ...overview.value.charts.timeline.points.map((item: Overview['charts']['timeline']['points'][number]) => item.supermarketCents + item.otherCents + item.housingCents)))
 const breakdownMaximum = computed(() => Math.max(1, ...overview.value.charts.breakdown.bars.map((item: { amountCents: number }) => item.amountCents)))
 const visibleComparisons = computed(() => overview.value.comparisons.filter((comparison: Overview['comparisons'][number]) => comparison.category === 'supermarket_total' || overview.value.periods[0]?.amounts.some((amount: MonthlySpendAmount) => amount.category === comparison.category)))
 const categoryLabels: Record<string, string> = {
@@ -75,7 +82,10 @@ const categoryLabels: Record<string, string> = {
   alcohol: 'Bebidas alcoólicas',
   tobacco_nicotine: 'Tabaco e nicotina',
   sweets_snacks_soft_drinks: 'Doces, snacks e refrigerantes',
-  other_discretionary: 'Outros gastos revistos'
+  other_discretionary: 'Outros gastos revistos',
+  rent: 'Renda',
+  mortgage_payment: 'Prestação da casa',
+  condominium_fee: 'Condomínio'
 }
 
 const resetForm = () => {
@@ -88,8 +98,9 @@ const resetForm = () => {
   amountBasis.value = 'memory_estimate'
   status.value = 'estimated'
   for (const item of categories) Object.assign(item, { selected: false, amount: '', reduce: false, target: '' })
+  for (const item of housingCosts) Object.assign(item, { selected: false, amount: '' })
 }
-const loadMonth = (value: string) => {
+const loadMonth = (value: string, shouldScroll = true) => {
   month.value = value.slice(0, 7)
   resetForm()
   detailsOpen.value = false
@@ -102,18 +113,22 @@ const loadMonth = (value: string) => {
   amountBasis.value = period.amountBasis
   status.value = period.status
   for (const amount of period.amounts) {
-    const form = amount.category === 'supermarket_total' ? supermarket : categories.find(item => item.category === amount.category)
+    const form = amount.category === 'supermarket_total' ? supermarket : categories.find(item => item.category === amount.category) || housingCosts.find(item => item.category === amount.category)
     if (!form) continue
-    if ('selected' in form) {
+    if ('scope' in form) {
       form.selected = true
       form.scope = amount.scope
     }
+    if ('selected' in form) form.selected = true
     form.amount = String(amount.amountCents / 100).replace('.', ',')
-    form.reduce = amount.trackingIntent === 'reduce'
-    form.target = amount.userTargetCents === undefined ? '' : String(amount.userTargetCents / 100).replace('.', ',')
+    if ('reduce' in form) {
+      form.reduce = amount.trackingIntent === 'reduce'
+      form.target = amount.userTargetCents === undefined ? '' : String(amount.userTargetCents / 100).replace('.', ',')
+    }
   }
-  document.getElementById('monthly-entry')?.scrollIntoView({ behavior: 'smooth' })
+  if (shouldScroll && import.meta.client) document.getElementById('monthly-entry')?.scrollIntoView({ behavior: 'smooth' })
 }
+loadMonth(month.value, false)
 const addPreviousMonth = () => {
   const oldest = overview.value.periods.at(-1)?.month
   const base = oldest ? new Date(`${oldest}T00:00:00Z`) : new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
@@ -334,6 +349,31 @@ const save = async () => {
           </article>
         </div>
 
+        <div class="entry-heading entry-heading--categories">
+          <div><span class="step-number">Contexto</span><h2>Custos de habitação</h2><p>Renda, prestação e condomínio servem de contexto para o custo real do agregado. Não são tratados como desperdício, comparados com outras famílias nem usados para estimar poupança.</p></div>
+        </div>
+        <div class="category-questions housing-questions">
+          <article
+            v-for="item in housingCosts"
+            :key="item.category"
+            class="category-question"
+            :class="{ 'category-question--active': item.selected }"
+          >
+            <label class="category-select"><input
+              v-model="item.selected"
+              type="checkbox"
+            ><span><strong>{{ item.label }}</strong><small>Opcional · contexto factual deste mês</small></span></label>
+            <label
+              v-if="item.selected"
+              class="target-field"
+            >Montante mensal em EUR<div class="money-input"><input
+              v-model="item.amount"
+              inputmode="decimal"
+              placeholder="0,00"
+            ><span>EUR</span></div></label>
+          </article>
+        </div>
+
         <div class="evidence-options">
           <label>O total vem de<select v-model="amountBasis"><option value="statement_or_receipts">Extrato ou talões</option><option value="calculated_estimate">Estimativa calculada</option><option value="memory_estimate">Estimativa de memória</option></select></label>
           <label>O supermercado inclui<select v-model="coverage"><option value="food_only">Só alimentação</option><option value="includes_cleaning_hygiene">Alimentação, limpeza e higiene</option><option value="unknown">Não tenho a certeza</option></select></label>
@@ -374,19 +414,6 @@ const save = async () => {
             </h2>
           </div>
         </div>
-        <div class="saved-total">
-          <span>Total do mês mais recente</span>
-          <strong>{{ eur(overview.charts.breakdown.totalCents) }}</strong>
-          <p>Se este valor se repetisse durante 12 meses, seriam {{ eur(overview.charts.breakdown.totalCents * 12) }}. Isto descreve a dimensão do gasto; não assume que é desperdício.</p>
-        </div>
-        <aside
-          v-if="overview.moneyAtRisk.monthlyCents > 0"
-          class="risk-preview risk-preview--persisted"
-        >
-          <span>Cenário guardado — dinheiro em risco</span>
-          <strong>{{ eur(overview.moneyAtRisk.monthlyCents) }} por mês</strong>
-          <p>{{ eur(overview.moneyAtRisk.annualCents) }} por ano apenas se cumprires todos os limites que declaraste. Não é uma previsão nem uma garantia de poupança.</p>
-        </aside>
         <button
           class="details-toggle"
           type="button"
@@ -399,28 +426,44 @@ const save = async () => {
         <div
           v-if="analysisOpen"
           id="full-spending-analysis"
-          class="comparison-list"
+          class="spending-analysis-detail"
         >
-          <article
-            v-for="comparison in visibleComparisons"
-            :key="comparison.category"
-            class="comparison-card"
+          <div class="saved-total">
+            <span>Total do mês mais recente</span>
+            <strong>{{ eur(overview.charts.breakdown.totalCents) }}</strong>
+            <p>Se este valor se repetisse durante 12 meses, seriam {{ eur(overview.charts.breakdown.totalCents * 12) }}. Isto descreve a dimensão do gasto; não assume que é desperdício.</p>
+          </div>
+          <aside
+            v-if="overview.moneyAtRisk.monthlyCents > 0"
+            class="risk-preview risk-preview--persisted"
           >
-            <h3>{{ categoryLabels[comparison.category] || comparison.category }}</h3>
-            <strong>Histórico próprio</strong>
-            <p>{{ comparison.ownHistory?.reason || 'Os meses comparáveis não mostram um aumento acima dos limiares definidos.' }}</p>
-            <strong>Agregados semelhantes</strong>
-            <p v-if="comparison.ownHistory?.kind !== 'CHECK_UNAVAILABLE'">
-              Não consultado: o histórico próprio tinha dados suficientes.
-            </p>
-            <p v-else>
-              {{ comparison.anonymousCohort?.reason || 'A comparação anónima exata disponível não assinalou um valor acima do limiar definido.' }}
-            </p>
-          </article>
+            <span>Cenário guardado — dinheiro em risco</span>
+            <strong>{{ eur(overview.moneyAtRisk.monthlyCents) }} por mês</strong>
+            <p>{{ eur(overview.moneyAtRisk.annualCents) }} por ano apenas se cumprires todos os limites que declaraste. Não é uma previsão nem uma garantia de poupança.</p>
+          </aside>
+          <div class="comparison-list">
+            <article
+              v-for="comparison in visibleComparisons"
+              :key="comparison.category"
+              class="comparison-card"
+            >
+              <h3>{{ categoryLabels[comparison.category] || comparison.category }}</h3>
+              <strong>Histórico próprio</strong>
+              <p>{{ comparison.ownHistory?.reason || 'Os meses comparáveis não mostram um aumento acima dos limiares definidos.' }}</p>
+              <strong>Agregados semelhantes</strong>
+              <p v-if="comparison.ownHistory?.kind !== 'CHECK_UNAVAILABLE'">
+                Não consultado: o histórico próprio tinha dados suficientes.
+              </p>
+              <p v-else>
+                {{ comparison.anonymousCohort?.reason || 'A comparação anónima exata disponível não assinalou um valor acima do limiar definido.' }}
+              </p>
+            </article>
+          </div>
         </div>
       </section>
 
       <section
+        v-if="analysisOpen"
         class="spending-chart panel"
         aria-labelledby="evolution-title"
       >
@@ -461,10 +504,14 @@ const save = async () => {
             class="timeline-column"
           >
             <div
-              v-if="point.supermarketCents + point.otherCents > 0"
+              v-if="point.supermarketCents + point.otherCents + point.housingCents > 0"
               class="column-stack"
-              :style="{ height: `${(point.supermarketCents + point.otherCents) / timelineMaximum * 100}%` }"
+              :style="{ height: `${(point.supermarketCents + point.otherCents + point.housingCents) / timelineMaximum * 100}%` }"
             >
+              <span
+                class="column-housing"
+                :style="{ flexGrow: point.housingCents }"
+              />
               <span
                 class="column-other"
                 :style="{ flexGrow: point.otherCents }"
@@ -473,7 +520,7 @@ const save = async () => {
                 :style="{ flexGrow: point.supermarketCents }"
               />
             </div>
-            <strong>{{ monthLabel(point.month) }}</strong><small>{{ eur(point.supermarketCents + point.otherCents) }}<span v-if="point.highlighted"> · mais recente</span></small>
+            <strong>{{ monthLabel(point.month) }}</strong><small>{{ eur(point.supermarketCents + point.otherCents + point.housingCents) }}<span v-if="point.highlighted"> · mais recente</span></small>
           </div>
         </div>
         <ul class="accessible-values">
@@ -481,12 +528,13 @@ const save = async () => {
             v-for="point in overview.charts.timeline.points"
             :key="`value-${point.month}`"
           >
-            <strong>{{ monthLabel(point.month) }}</strong>: supermercado {{ eur(point.supermarketCents) }}; outros gastos {{ eur(point.otherCents) }}<span v-if="point.highlighted">; mês mais recente</span>.
+            <strong>{{ monthLabel(point.month) }}</strong>: supermercado {{ eur(point.supermarketCents) }}; outros gastos {{ eur(point.otherCents) }}; habitação {{ eur(point.housingCents) }}<span v-if="point.highlighted">; mês mais recente</span>.
           </li>
         </ul>
       </section>
 
       <section
+        v-if="analysisOpen"
         class="spending-chart panel"
         aria-labelledby="breakdown-title"
       >

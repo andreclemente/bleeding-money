@@ -1,8 +1,8 @@
-import { CohortSpendAnalyzer, OwnHistorySpendAnalyzer, buildSpendChartData, calculateMoneyAtRisk, spendCategories, type SpendInsight } from '../../domain/spending'
+import { CohortSpendAnalyzer, OwnHistorySpendAnalyzer, auditableSpendCategories, buildSpendChartData, calculateMoneyAtRisk, type SpendInsight } from '../../domain/spending'
 import type { PoupancasRepository } from '../db/repository'
 
 export interface SpendingComparison {
-  category: typeof spendCategories[number]
+  category: typeof auditableSpendCategories[number]
   ownHistory: SpendInsight | null
   anonymousCohort: SpendInsight | null
 }
@@ -15,7 +15,7 @@ export const spendingOverview = async (repository: PoupancasRepository, userId: 
   ])
   const latest = periods[0]
   const risk = calculateMoneyAtRisk(latest?.amounts || [])
-  const declaredCategories = latest ? spendCategories.filter(category => category === 'supermarket_total' || latest.amounts.some(amount => amount.category === category)) : []
+  const declaredCategories = latest ? auditableSpendCategories.filter(category => category === 'supermarket_total' || latest.amounts.some(amount => amount.category === category)) : []
   const comparisons: SpendingComparison[] = latest ? declaredCategories.map(category => {
     const ownHistory = new OwnHistorySpendAnalyzer().analyze(latest, periods.slice(1), category)
     const anonymousCohort = ownHistory?.kind === 'CHECK_UNAVAILABLE'

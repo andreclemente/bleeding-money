@@ -40,7 +40,8 @@ const periodBody = {
   amounts: [
     { category: 'supermarket_total', scope: 'supermarket', amountCents: 56000, trackingIntent: 'track_only' },
     { category: 'sweets_snacks_soft_drinks', scope: 'supermarket', amountCents: 6000, trackingIntent: 'reduce', userTargetCents: 3000 },
-    { category: 'fast_food_takeaway', scope: 'outside_supermarket', amountCents: 9000, trackingIntent: 'reduce', userTargetCents: 5000 }
+    { category: 'fast_food_takeaway', scope: 'outside_supermarket', amountCents: 9000, trackingIntent: 'reduce', userTargetCents: 5000 },
+    { category: 'mortgage_payment', scope: 'housing', amountCents: 72500, trackingIntent: 'track_only' }
   ]
 }
 
@@ -71,6 +72,7 @@ describe('API autenticada de gastos mensais', () => {
       },
       comparisonOrder: ['own_history', 'anonymous_exact_cohort']
     })
+    expect(own).toMatchObject({ charts: { breakdown: { totalCents: 137500 }, timeline: { points: [{ housingCents: 72500 }] } } })
     expect((own.comparisons as Array<{ category: string }>).map(item => item.category)).toEqual([
       'supermarket_total',
       'fast_food_takeaway',
