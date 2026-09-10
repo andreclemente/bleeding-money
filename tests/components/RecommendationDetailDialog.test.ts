@@ -77,34 +77,16 @@ describe('RecommendationDetailDialog', () => {
     expect(wrapper.emitted('resolve')).toBeUndefined()
   })
 
-  it('initializes and resets the proposed cost from each finding midpoint in cents', async () => {
+  it('começa e reinicia o novo custo em branco sem converter uma estimativa em confirmação', async () => {
     const wrapper = mountDialog()
 
-    expect(wrapper.get('[data-testid="new-cost"]').attributes('value')).toBe('33.98')
+    expect(wrapper.get('[data-testid="new-cost"]').attributes('value')).toBe('')
+    expect(wrapper.get('[data-testid="resolve-finding"]').attributes()).toHaveProperty('disabled')
 
-    const nextFinding = {
-      ...finding,
-      id: 'finding-2',
-      expenseId: 'expense-2',
-      estimatedMonthlySavingMinCents: 201,
-      estimatedMonthlySavingMaxCents: 400
-    }
-    await wrapper.setProps({ finding: nextFinding, currentExpenseCostCents: 1299 })
+    await wrapper.get('[data-testid="new-cost"]').setValue('12.34')
+    await wrapper.setProps({ finding: { ...finding, id: 'finding-2', expenseId: 'expense-2' }, currentExpenseCostCents: 1299 })
 
-    expect(wrapper.get('[data-testid="new-cost"]').attributes('value')).toBe('9.98')
-  })
-
-  it('clamps the finding-specific estimate to the valid expense range', () => {
-    const wrapper = mountDialog({
-      currentExpenseCostCents: 500,
-      finding: {
-        ...finding,
-        estimatedMonthlySavingMinCents: 700,
-        estimatedMonthlySavingMaxCents: 900
-      }
-    })
-
-    expect(wrapper.get('[data-testid="new-cost"]').attributes('value')).toBe('0')
+    expect(wrapper.get('[data-testid="new-cost"]').attributes('value')).toBe('')
   })
 
   it.each([

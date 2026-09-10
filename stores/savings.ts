@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import type { RecurringExpense, SavingsFinding } from '../domain/types'
+import type { FamilyRoute } from '../domain/family-route'
 
-interface Dashboard { monthlyExpensesCents: number, potentialMonthlyMinCents: number, potentialMonthlyMaxCents: number, realizedAnnualCents: number, lastAnalysisAt: string | null, priorityFindings: SavingsFinding[], expenses: RecurringExpense[] }
 export const useSavingsStore = defineStore('savings', () => {
-  const dashboard = ref<Dashboard | null>(null)
+  const dashboard = ref<FamilyRoute | null>(null)
   const expenses = ref<RecurringExpense[]>([])
   const findings = ref<SavingsFinding[]>([])
   const loading = ref(false)

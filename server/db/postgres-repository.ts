@@ -3,6 +3,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { annualSaving } from '../../domain/savings'
 import { findingCycleKey } from '../../domain/finding'
+import { confirmedGoalProgress, parseSavingsGoalInput, type SavingsGoal, type SavingsGoalInput } from '../../domain/savings-goal'
 import { adultBand, amountBases, dependentBand, parseHouseholdInput, parseMonthlySpendInput, spendCategories, spendScopes, spendStatuses, supermarketCoverages, trackingIntents, type AnonymousCohortAggregate, type HouseholdInput, type HouseholdProfile, type MonthlySpendInput, type MonthlySpendPeriod } from '../../domain/spending'
 import type { ExpenseDetails, ExpenseSnapshot, MarketObservation, RecurringExpense, SavingAction, SavingsFinding } from '../../domain/types'
 import type { StoredOwner, StoredSession } from '../auth/types'
@@ -95,6 +96,15 @@ export const cohortFrom = (row: Record<string, unknown>): AnonymousCohortAggrega
     if (windowStart > windowEnd) throw pgStoredError()
     const source = typeof row.source === 'string' && row.source.trim() ? row.source : (() => { throw pgStoredError() })()
     return { id: String(row.id), category: pgEnum(row.category, spendCategories), scope: pgEnum(row.scope, spendScopes), country: 'PT', adultBand: adultBandValue, dependentBand: dependentBandValue, supermarketCoverage: pgEnum(row.supermarket_coverage, supermarketCoverages), amountBasis: pgEnum(row.amount_basis, amountBases), status: pgEnum(row.status, spendStatuses), windowStart, windowEnd, householdCount: pgInteger(row.household_count), p25Cents, medianCents, p75Cents, source, confidence: pgFinite(row.confidence, 0, 1) }
+  } catch { throw pgStoredError() }
+}
+export const goalFrom = (row: Record<string, unknown>): SavingsGoal => {
+  try {
+    const parsed = parseSavingsGoalInput({ name: row.name, targetAnnualCents: pgInteger(row.target_annual_cents, 1) })
+    const createdAt = pgIso(row.created_at)
+    const updatedAt = pgIso(row.updated_at)
+    if (Date.parse(updatedAt) < Date.parse(createdAt)) throw pgStoredError()
+    return { id: String(row.id), userId: String(row.user_id), ...parsed, createdAt, updatedAt }
   } catch { throw pgStoredError() }
 }
 const expenseSql = 'select e.*, ed.contracted_power_kva, ed.tariff_type, ed.price_per_kwh_cents, ed.power_price_per_day_cents, ed.annual_consumption_kwh, ed.max_historical_power_kva, td.connection_type, td.download_speed_mbps, td.upload_speed_mbps, td.mobile_data_gb, td.mobile_lines, td.tv_included, bd.account_maintenance_fee_cents, bd.card_annual_fee_cents, bd.transfer_fees_cents, sd.plan, sd.last_used_at, sd.usage_frequency, id.policy_type, id.renewal_date, id.coverage_codes from recurring_expenses e left join electricity_details ed on ed.expense_id=e.id left join telecom_details td on td.expense_id=e.id left join bank_details bd on bd.expense_id=e.id left join subscription_details sd on sd.expense_id=e.id left join insurance_details id on id.expense_id=e.id'
@@ -360,5 +370,18 @@ export class PostgresRepository implements PoupancasRepository {
   }
   async listAnonymousSpendCohorts() {
     return (await this.pool.query('select * from spend_cohort_aggregates order by window_end desc')).rows.map(cohortFrom)
+  }
+  async getSavingsGoal(userId: string) {
+    const row = (await this.pool.query('select * from savings_goals where user_id=$1', [userId])).rows[0]
+    return row ? goalFrom(row) : null
+  }
+  async upsertSavingsGoal(userId: string, raw: SavingsGoalInput) {
+    const input = parseSavingsGoalInput(raw)
+    const row = (await this.pool.query('insert into savings_goals (id,user_id,name,target_annual_cents) values ($1,$2,$3,$4) on conflict (user_id) do update set name=excluded.name,target_annual_cents=excluded.target_annual_cents,updated_at=now() returning *', [crypto.randomUUID(), userId, input.name, input.targetAnnualCents])).rows[0]
+    return goalFrom(row)
+  }
+  async getSavingsGoalProgress(userId: string) {
+    const goal = await this.getSavingsGoal(userId)
+    return goal ? confirmedGoalProgress(goal, await this.listActions(userId)) : null
   }
 }

@@ -13,9 +13,9 @@ O sistema é um **workspace pessoal de proprietário único**, não uma aplicaç
 
 ## Persistência e migração
 
-O agregado `RecurringExpense` mantém os campos comuns; detalhes de eletricidade, telecom, banca e subscrição são tipados. `ExpenseSnapshot` é histórico append-only. Findings e ações ligam-se à despesa e herdam isolamento pelo proprietário. `MarketObservation` é inteligência de mercado anónima, sem identidade pessoal.
+O agregado `RecurringExpense` mantém os campos comuns; detalhes de eletricidade, telecom, banca, subscrição e seguros são tipados. `ExpenseSnapshot` é histórico append-only. Findings e ações ligam-se à despesa e herdam isolamento pelo proprietário. `MarketObservation` é inteligência de mercado anónima, sem identidade pessoal.
 
-Sem `DATABASE_URL`, `JsonFileRepository` grava estado v2 (`owner`, `sessions`, despesas, snapshots, findings, ações e observações anónimas). Aceita v1 e migra na próxima escrita. Cada operação relê o ficheiro dentro de uma fila partilhada por caminho e grava temporário+rename; toda a estrutura e relações são validadas antes de uso. Conta, primeira sessão e reivindicação legada são uma única mutação, logo um crash não deixa a conta sem dados reclamáveis. Login e autenticação repetem a reivindicação idempotente se o marcador faltar.
+Sem `DATABASE_URL`, `JsonFileRepository` grava estado v4 (`owner`, `sessions`, despesas, snapshots, findings, ações, observações anónimas, perfis familiares, períodos mensais, coortes agregadas e objetivos). Aceita versões anteriores e migra na próxima escrita. Cada operação relê o ficheiro dentro de uma fila partilhada por caminho e grava temporário+rename; toda a estrutura e relações são validadas antes de uso. Conta, primeira sessão e reivindicação legada são uma única mutação, logo um crash não deixa a conta sem dados reclamáveis. Login e autenticação repetem a reivindicação idempotente se o marcador faltar.
 
 Com PostgreSQL, o schema Drizzle acrescenta `password_hash`, `owner_key`, `legacy_claimed_at` e `auth_sessions`. O registo usa uma transação Drizzle: cria o proprietário, atualiza apenas `recurring_expenses.user_id` do UUID legado e cria a sessão. As tabelas ligadas não são reescritas. A constraint única de `owner_key` arbitra concorrência. Observações de mercado não são tocadas.
 
@@ -23,7 +23,7 @@ Com PostgreSQL, o schema Drizzle acrescenta `password_hash`, `owner_key`, `legac
 
 Middleware Nitro autentica o hash do cookie e coloca apenas o utilizador público em `event.context.auth`. Handlers protegidos chamam `getAuthenticatedUserId`; não leem IDs do corpo. `PUBLIC_ORIGIN` fixa a origem CSRF canónica. Cabeçalhos de proxy só participam no protocolo, host e IP do throttle com `TRUST_PROXY=true`; a predefinição usa exclusivamente ligação, host e IP diretos. Públicos: disponibilidade de registo, sessão, login, registo, logout e página metodológica. `GET /api/setup` autenticado responde apenas `{ onboardingNeeded, storageMode }`.
 
-Middleware de rota envia uma instalação sem proprietário para `/register`, visitantes posteriores para `/login`, e um proprietário sem despesas para `/welcome`. O dashboard segue o arquétipo Monitor: contexto compacto, intervalo potencial principal, realizado secundário e lista de ações. O wizard segue Configure: sete exemplos mapeados para os cinco DTOs reais, perguntas condicionais e divulgação dos checks disponíveis/indisponíveis. `/how-it-works` segue Decide/Learn e documenta as regras auditáveis implementadas. A análise corre ao criar/atualizar dados; avisos temporais de seguros são também reconciliados nas leituras de despesas e recomendações.
+Middleware de rota envia uma instalação sem proprietário para `/register`, visitantes posteriores para `/login`, e um proprietário sem despesas nem períodos mensais para `/welcome`. A arquitetura de produto expõe quatro tarefas: **Hoje**, **Registar**, **Contratos** e **Objetivo**. Hoje apresenta a Rota Familiar: uma única próxima ação, escolhida por prioridades determinísticas e acompanhada por um extrato que mantém valores confirmados, estimativas identificadas e planos condicionais separados. O wizard recolhe contratos com perguntas específicas por categoria; Registar mantém a entrada mensal progressiva. `/how-it-works` documenta as regras auditáveis e a privacidade. A análise corre ao criar/atualizar dados; avisos temporais de seguros são também reconciliados nas leituras de despesas e recomendações.
 
 ## Regras implementadas
 
@@ -32,5 +32,8 @@ Middleware de rota envia uma instalação sem proprietário para `/register`, vi
 - Telecom: fidelização terminada com base apenas na data de fim (início opcional); benchmark acima de p75 com 10 casos PT comparáveis dos últimos 12 meses.
 - Banco: comissão de manutenção positiva, estimativa de 80–100%.
 - Eletricidade: potência contratada pelo menos 1 kVA acima do máximo e primeiro escalão padrão viável entre 1,15; 2,3; 3,45; 4,6; 5,75; 6,9; 10,35; 13,8; 17,25; 20,7; 27,6; 34,5 e 41,4 kVA. Se nenhum escalão cobrir o máximo histórico, não é criado finding.
+- Seguros: prazos de renovação usam dias civis e os checks factuais dependem de dados de cobertura e prémio introduzidos pelo proprietário; não são inventados preços comparáveis.
+- Histórico mensal: a comparação própria exige o mês mais recente e três meses anteriores com a mesma cobertura e base do montante. Coortes anónimas só aparecem com correspondência exata e pelo menos 10 agregados.
+- Objetivo familiar: o progresso soma exclusivamente reduções anuais de ações concluídas; intervalos identificados e planos condicionais nunca contam como realizados.
 
 Um estado saudável sem finding é válido; falta de dados opcionais é apresentada como check indisponível.

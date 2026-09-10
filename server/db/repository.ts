@@ -7,6 +7,7 @@ import { parsePasswordHash } from '../auth/crypto'
 import type { AuthRepository, StoredOwner, StoredSession } from '../auth/types'
 import { createSavingsEngine } from '../services/savings-engine'
 import { findingCycleKey } from '../../domain/finding'
+import { confirmedGoalProgress, parseSavingsGoalInput, type SavingsGoal, type SavingsGoalInput, type SavingsGoalProgress } from '../../domain/savings-goal'
 import { PostgresRepository } from './postgres-repository'
 import { demoActions, demoExpenses, demoFindings, demoMarketObservations, demoSnapshots } from './demo-data'
 
@@ -156,13 +157,16 @@ export interface PoupancasRepository extends AuthRepository {
   listMonthlySpendPeriods(userId: string): Promise<MonthlySpendPeriod[]>
   upsertMonthlySpendPeriod(userId: string, input: MonthlySpendInput): Promise<MonthlySpendPeriod>
   listAnonymousSpendCohorts(): Promise<AnonymousCohortAggregate[]>
+  getSavingsGoal(userId: string): Promise<SavingsGoal | null>
+  upsertSavingsGoal(userId: string, input: SavingsGoalInput): Promise<SavingsGoal>
+  getSavingsGoalProgress(userId: string): Promise<SavingsGoalProgress | null>
 }
 
 const snapshotProperties = (expense: RecurringExpense) => ({ provider: expense.provider, details: structuredClone(expense.details), contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate })
 const relevantState = (expense: RecurringExpense) => JSON.stringify({ provider: expense.provider, productName: expense.productName, monthlyCostCents: expense.monthlyCostCents, currency: expense.currency, contractStartDate: expense.contractStartDate, contractEndDate: expense.contractEndDate, commitmentEndDate: expense.commitmentEndDate, details: expense.details })
 
 export interface RepositoryState {
-  version: 3
+  version: 4
   expenses: RecurringExpense[]
   snapshots: ExpenseSnapshot[]
   findings: SavingsFinding[]
@@ -173,12 +177,13 @@ export interface RepositoryState {
   householdProfiles: HouseholdProfile[]
   monthlySpendPeriods: MonthlySpendPeriod[]
   anonymousCohortAggregates: AnonymousCohortAggregate[]
+  savingsGoals: SavingsGoal[]
 }
 
 interface MemoryRepositoryOptions { demo?: boolean, state?: RepositoryState }
 
 const initialState = (demo = false): RepositoryState => ({
-  version: 3,
+  version: 4,
   expenses: structuredClone(demo ? demoExpenses : []),
   snapshots: structuredClone(demo ? demoSnapshots : []),
   findings: structuredClone(demo ? demoFindings : []),
@@ -188,7 +193,8 @@ const initialState = (demo = false): RepositoryState => ({
   sessions: [],
   householdProfiles: [],
   monthlySpendPeriods: [],
-  anonymousCohortAggregates: []
+  anonymousCohortAggregates: [],
+  savingsGoals: []
 })
 
 const expenseCategories = ['electricity', 'telecom', 'bank', 'subscription', 'gym', 'insurance'] as const
@@ -442,6 +448,18 @@ const parseStoredCohort = (value: unknown): AnonymousCohortAggregate => {
   return row as unknown as AnonymousCohortAggregate
 }
 
+const parseStoredSavingsGoal = (value: unknown): SavingsGoal => {
+  const row = storedObject(value)
+  rejectUnknown(row, ['id', 'userId', 'name', 'targetAnnualCents', 'createdAt', 'updatedAt'])
+  storedUuid(row.id)
+  storedUuid(row.userId)
+  parseSavingsGoalInput({ name: row.name, targetAnnualCents: row.targetAnnualCents })
+  const createdAt = storedTimestamp(row.createdAt)
+  const updatedAt = storedTimestamp(row.updatedAt)
+  assertStored(Date.parse(updatedAt) >= Date.parse(createdAt))
+  return row as unknown as SavingsGoal
+}
+
 const uniqueIds = (items: Array<{ id: string }>) => new Set(items.map(item => item.id)).size === items.length
 
 const parseRepositoryState = (value: unknown): RepositoryState => {
@@ -450,10 +468,12 @@ const parseRepositoryState = (value: unknown): RepositoryState => {
     const version = row.version
     const baseKeys = ['version', 'expenses', 'snapshots', 'findings', 'actions', 'marketObservations', 'owner', 'sessions']
     const spendingKeys = ['householdProfiles', 'monthlySpendPeriods', 'anonymousCohortAggregates']
-    rejectUnknown(row, version === 1 ? ['version', 'expenses', 'snapshots', 'findings', 'actions'] : version === 3 ? [...baseKeys, ...spendingKeys] : baseKeys)
-    assertStored((version === 1 || version === 2 || version === 3) && Array.isArray(row.expenses) && Array.isArray(row.snapshots) && Array.isArray(row.findings) && Array.isArray(row.actions))
-    if (version === 2 || version === 3) assertStored(Array.isArray(row.marketObservations) && Array.isArray(row.sessions))
-    if (version === 3) assertStored(Array.isArray(row.householdProfiles) && Array.isArray(row.monthlySpendPeriods) && Array.isArray(row.anonymousCohortAggregates))
+    const goalKeys = ['savingsGoals']
+    rejectUnknown(row, version === 1 ? ['version', 'expenses', 'snapshots', 'findings', 'actions'] : version === 3 ? [...baseKeys, ...spendingKeys] : version === 4 ? [...baseKeys, ...spendingKeys, ...goalKeys] : baseKeys)
+    assertStored((version === 1 || version === 2 || version === 3 || version === 4) && Array.isArray(row.expenses) && Array.isArray(row.snapshots) && Array.isArray(row.findings) && Array.isArray(row.actions))
+    if (version === 2 || version === 3 || version === 4) assertStored(Array.isArray(row.marketObservations) && Array.isArray(row.sessions))
+    if (version === 3 || version === 4) assertStored(Array.isArray(row.householdProfiles) && Array.isArray(row.monthlySpendPeriods) && Array.isArray(row.anonymousCohortAggregates))
+    if (version === 4) assertStored(Array.isArray(row.savingsGoals))
     const expenses = row.expenses.map(parseStoredExpense)
     const snapshots = row.snapshots.map(parseStoredSnapshot)
     const findings = row.findings.map(parseStoredFinding)
@@ -461,11 +481,13 @@ const parseRepositoryState = (value: unknown): RepositoryState => {
     const marketObservations = version === 1 ? structuredClone(demoMarketObservations) : (row.marketObservations as unknown[]).map(parseStoredObservation)
     const owner = version === 1 ? null : parseStoredOwner(row.owner)
     const sessions = version === 1 ? [] : (row.sessions as unknown[]).map(parseStoredSession)
-    const householdProfiles = version === 3 ? (row.householdProfiles as unknown[]).map(parseStoredHouseholdProfile) : []
-    const monthlySpendPeriods = version === 3 ? (row.monthlySpendPeriods as unknown[]).map(parseStoredSpendPeriod) : []
-    const anonymousCohortAggregates = version === 3 ? (row.anonymousCohortAggregates as unknown[]).map(parseStoredCohort) : []
+    const householdProfiles = version === 3 || version === 4 ? (row.householdProfiles as unknown[]).map(parseStoredHouseholdProfile) : []
+    const monthlySpendPeriods = version === 3 || version === 4 ? (row.monthlySpendPeriods as unknown[]).map(parseStoredSpendPeriod) : []
+    const anonymousCohortAggregates = version === 3 || version === 4 ? (row.anonymousCohortAggregates as unknown[]).map(parseStoredCohort) : []
+    const savingsGoals = version === 4 ? (row.savingsGoals as unknown[]).map(parseStoredSavingsGoal) : []
     assertStored(uniqueIds(expenses) && uniqueIds(snapshots) && uniqueIds(findings) && uniqueIds(actions) && uniqueIds(marketObservations) && uniqueIds(sessions) && uniqueIds(monthlySpendPeriods) && uniqueIds(anonymousCohortAggregates))
     assertStored(new Set(householdProfiles.map(item => item.userId)).size === householdProfiles.length)
+    assertStored(new Set(savingsGoals.map(item => item.userId)).size === savingsGoals.length)
     assertStored(new Set(monthlySpendPeriods.map(item => `${item.userId}:${item.month}`)).size === monthlySpendPeriods.length)
     assertStored(uniqueIds(monthlySpendPeriods.flatMap(item => item.amounts)))
     const expenseIds = new Set(expenses.map(item => item.id))
@@ -481,7 +503,7 @@ const parseRepositoryState = (value: unknown): RepositoryState => {
       const savingActionId = snapshot.properties.savingActionId
       if (savingActionId !== undefined) assertStored(typeof savingActionId === 'string' && actionIds.has(savingActionId))
     }
-    return structuredClone({ version: 3, expenses, snapshots, findings, actions, marketObservations, owner, sessions, householdProfiles, monthlySpendPeriods, anonymousCohortAggregates })
+    return structuredClone({ version: 4, expenses, snapshots, findings, actions, marketObservations, owner, sessions, householdProfiles, monthlySpendPeriods, anonymousCohortAggregates, savingsGoals })
   } catch {
     throw new Error('Ficheiro de dados local corrupto')
   }
@@ -498,6 +520,7 @@ export class MemoryRepository implements PoupancasRepository {
   private householdProfiles: HouseholdProfile[]
   private monthlySpendPeriods: MonthlySpendPeriod[]
   private anonymousCohortAggregates: AnonymousCohortAggregate[]
+  private savingsGoals: SavingsGoal[]
   private engine = createSavingsEngine()
 
   constructor(options: MemoryRepositoryOptions = {}) {
@@ -512,10 +535,11 @@ export class MemoryRepository implements PoupancasRepository {
     this.householdProfiles = structuredClone(state.householdProfiles)
     this.monthlySpendPeriods = structuredClone(state.monthlySpendPeriods)
     this.anonymousCohortAggregates = structuredClone(state.anonymousCohortAggregates)
+    this.savingsGoals = structuredClone(state.savingsGoals)
   }
 
   exportState(): RepositoryState {
-    return structuredClone({ version: 3, expenses: this.expenses, snapshots: this.snapshots, findings: this.findings, actions: this.actions, marketObservations: this.observations, owner: this.owner, sessions: this.sessions, householdProfiles: this.householdProfiles, monthlySpendPeriods: this.monthlySpendPeriods, anonymousCohortAggregates: this.anonymousCohortAggregates })
+    return structuredClone({ version: 4, expenses: this.expenses, snapshots: this.snapshots, findings: this.findings, actions: this.actions, marketObservations: this.observations, owner: this.owner, sessions: this.sessions, householdProfiles: this.householdProfiles, monthlySpendPeriods: this.monthlySpendPeriods, anonymousCohortAggregates: this.anonymousCohortAggregates, savingsGoals: this.savingsGoals })
   }
 
   async getOwner() { return structuredClone(this.owner) }
@@ -687,6 +711,23 @@ export class MemoryRepository implements PoupancasRepository {
     return structuredClone(period)
   }
   async listAnonymousSpendCohorts() { return structuredClone(this.anonymousCohortAggregates) }
+  async getSavingsGoal(userId: string) { return structuredClone(this.savingsGoals.find(item => item.userId === userId) || null) }
+  async upsertSavingsGoal(userId: string, raw: SavingsGoalInput) {
+    const input = parseSavingsGoalInput(raw)
+    const now = new Date().toISOString()
+    const existing = this.savingsGoals.find(item => item.userId === userId)
+    if (existing) {
+      Object.assign(existing, input, { updatedAt: now })
+      return structuredClone(existing)
+    }
+    const goal: SavingsGoal = { id: crypto.randomUUID(), userId, ...input, createdAt: now, updatedAt: now }
+    this.savingsGoals.push(goal)
+    return structuredClone(goal)
+  }
+  async getSavingsGoalProgress(userId: string) {
+    const goal = await this.getSavingsGoal(userId)
+    return goal ? confirmedGoalProgress(goal, await this.listActions(userId)) : null
+  }
 }
 
 const fileMutationQueues = new Map<string, Promise<void>>()
@@ -767,6 +808,9 @@ export class JsonFileRepository implements PoupancasRepository {
   listMonthlySpendPeriods(userId: string) { return this.read(() => this.repository.listMonthlySpendPeriods(userId)) }
   upsertMonthlySpendPeriod(userId: string, input: MonthlySpendInput) { return this.mutate(() => this.repository.upsertMonthlySpendPeriod(userId, input)) }
   listAnonymousSpendCohorts() { return this.read(() => this.repository.listAnonymousSpendCohorts()) }
+  getSavingsGoal(userId: string) { return this.read(() => this.repository.getSavingsGoal(userId)) }
+  upsertSavingsGoal(userId: string, input: SavingsGoalInput) { return this.mutate(() => this.repository.upsertSavingsGoal(userId, input)) }
+  getSavingsGoalProgress(userId: string) { return this.read(() => this.repository.getSavingsGoalProgress(userId)) }
 }
 
 let postgres: PostgresRepository | undefined

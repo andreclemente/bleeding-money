@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { cohortFrom, detailsFrom, householdFrom, spendPeriodFrom } from '../../server/db/postgres-repository'
+import { cohortFrom, detailsFrom, goalFrom, householdFrom, spendPeriodFrom } from '../../server/db/postgres-repository'
 
 const periodRow = {
   id: '10000000-0000-4000-8000-000000000010', user_id: '10000000-0000-4000-8000-000000000001',
@@ -12,6 +12,17 @@ const amount = { id: '10000000-0000-4000-8000-000000000011', periodId: periodRow
 const cohortRow = { id: '10000000-0000-4000-8000-000000000012', category: 'supermarket_total', scope: 'supermarket', country: 'PT', adult_band: '2', dependent_band: '1', supermarket_coverage: 'food_only', amount_basis: 'statement_or_receipts', status: 'complete', window_start: '2026-01-01', window_end: '2026-08-31', household_count: 10, p25_cents: 30000, median_cents: 40000, p75_cents: 50000, source: 'fixture', confidence: 0.8 }
 
 describe('paridade PostgreSQL fail-closed', () => {
+  it('migra, valida e isola o objetivo familiar por utilizador', async () => {
+    const migration = await readFile(new URL('../../drizzle/0006_savings_goal.sql', import.meta.url), 'utf8')
+    const repository = await readFile(new URL('../../server/db/postgres-repository.ts', import.meta.url), 'utf8')
+    expect(migration).toMatch(/create table "savings_goals"/i)
+    expect(migration).toMatch(/unique[^\n]+"user_id"/i)
+    expect(migration).toMatch(/target_annual_cents[^\n]+> 0/i)
+    expect(repository).toMatch(/where user_id=\$1/i)
+    expect(goalFrom({ id: '10000000-0000-4000-8000-000000000020', user_id: periodRow.user_id, name: 'Reserva', target_annual_cents: 120000, created_at: periodRow.created_at, updated_at: periodRow.updated_at })).toMatchObject({ name: 'Reserva', targetAnnualCents: 120000 })
+    expect(() => goalFrom({ id: 'x', user_id: periodRow.user_id, name: '', target_annual_cents: -1, created_at: periodRow.created_at, updated_at: periodRow.updated_at })).toThrow(/PostgreSQL/i)
+  })
+
   it('fecha concorrência de findings e restringe todas as coberturas na base de dados', async () => {
     const repository = await readFile(new URL('../../server/db/postgres-repository.ts', import.meta.url), 'utf8')
     const migration = await readFile(new URL('../../drizzle/0005_condemned_tiger_shark.sql', import.meta.url), 'utf8')

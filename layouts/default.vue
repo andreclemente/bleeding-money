@@ -20,7 +20,7 @@ const logout = async () => {
       <NuxtLink
         class="brand"
         to="/dashboard"
-        aria-label="BleedingMoney — monitor"
+        aria-label="BleedingMoney — Hoje"
       >
         <span
           class="brand-mark"
@@ -28,56 +28,46 @@ const logout = async () => {
         >BM</span><span>BleedingMoney</span>
       </NuxtLink>
       <p class="workspace-label">
-        Espaço pessoal privado
+        Caderno familiar privado
       </p>
       <div class="nav-label">
-        Monitorização
+        Tarefas
       </div>
       <nav class="app-nav">
         <NuxtLink
           class="nav-link"
           to="/dashboard"
         >
-          <span
-            class="nav-index"
-            aria-hidden="true"
-          >01</span><span>Monitor</span>
+          <span>Hoje</span>
         </NuxtLink>
         <NuxtLink
           class="nav-link"
           to="/spending"
         >
-          <span
-            class="nav-index"
-            aria-hidden="true"
-          >02</span><span>Gastos mensais</span>
+          <span>Registar</span>
         </NuxtLink>
         <NuxtLink
           class="nav-link"
           to="/expenses"
         >
-          <span
-            class="nav-index"
-            aria-hidden="true"
-          >03</span><span>Despesas</span>
+          <span>Contratos</span>
         </NuxtLink>
         <NuxtLink
           class="nav-link"
-          to="/findings"
+          to="/savings-goal"
         >
-          <span
-            class="nav-index"
-            aria-hidden="true"
-          >04</span><span>Recomendações</span>
+          <span>Objetivo</span>
         </NuxtLink>
-        <NuxtLink
-          class="nav-link"
-          to="/how-it-works"
-        >
-          <span
-            class="nav-index"
-            aria-hidden="true"
-          >05</span><span>Como funciona</span>
+      </nav>
+      <nav
+        class="secondary-nav"
+        aria-label="Método e privacidade"
+      >
+        <NuxtLink to="/how-it-works">
+          Método e privacidade
+        </NuxtLink>
+        <NuxtLink to="/findings">
+          Arquivo de casos
         </NuxtLink>
       </nav>
       <div

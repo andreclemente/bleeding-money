@@ -44,8 +44,9 @@ describe('experiência de gastos mensais', () => {
       readFile(new URL('../../pages/welcome.vue', import.meta.url), 'utf8')
     ])
 
-    expect(layout).toMatch(/to="\/spending"[\s\S]*Gastos mensais/)
-    expect(dashboard).toMatch(/to="\/spending"[\s\S]*supermercado/i)
+    expect(layout).toMatch(/to="\/spending"[\s\S]*Registar/)
+    expect(dashboard).toMatch(/to="\/spending"[\s\S]*Registar/)
+    expect(dashboard).not.toContain('monthly-spending-callout')
     expect(welcome).toMatch(/to="\/spending"[\s\S]*supermercado/i)
   })
 })

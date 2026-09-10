@@ -16,18 +16,7 @@ const emit = defineEmits<{
   resolve: [newCostCents: number]
 }>()
 
-const estimatedNewCost = () => {
-  if (!props.finding || !Number.isFinite(props.currentExpenseCostCents)) return ''
-  const midpointSavingCents = Math.round(
-    (props.finding.estimatedMonthlySavingMinCents + props.finding.estimatedMonthlySavingMaxCents) / 2
-  )
-  const newCostCents = Math.min(
-    props.currentExpenseCostCents,
-    Math.max(0, props.currentExpenseCostCents - midpointSavingCents)
-  )
-  return String(newCostCents / 100)
-}
-const newCost = ref<string | number>(estimatedNewCost())
+const newCost = ref<string | number>('')
 const money = (cents: number) => new Intl.NumberFormat('pt-PT', {
   style: 'currency',
   currency: 'EUR'
@@ -42,7 +31,7 @@ const hasEstimatedSaving = computed(() => !!props.finding && (props.finding.esti
 
 watch(
   [() => props.finding?.id, () => props.currentExpenseCostCents],
-  () => { newCost.value = estimatedNewCost() }
+  () => { newCost.value = '' }
 )
 
 const parsedNewCost = computed(() => {

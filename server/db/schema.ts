@@ -82,3 +82,15 @@ export const savingsFindings = pgTable('savings_findings', {
 export const savingActions = pgTable('saving_actions', {
   id: uuid('id').primaryKey(), findingId: uuid('finding_id').notNull().references(() => savingsFindings.id), previousCostCents: integer('previous_cost_cents').notNull(), newCostCents: integer('new_cost_cents').notNull(), actionDate: date('action_date').notNull(), annualSavingCents: integer('annual_saving_cents').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, table => [uniqueIndex('saving_action_finding_idx').on(table.findingId)])
+export const savingsGoals = pgTable('savings_goals', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  targetAnnualCents: integer('target_annual_cents').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [
+  uniqueIndex('savings_goals_user_idx').on(table.userId),
+  check('savings_goals_name_check', sql`length(trim(${table.name})) between 1 and 80`),
+  check('savings_goals_target_check', sql`${table.targetAnnualCents} > 0`)
+])

@@ -43,6 +43,13 @@
       "when": 1788959978665,
       "tag": "0005_condemned_tiger_shark",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788980211883,
+      "tag": "0006_savings_goal",
+      "breakpoints": true
     }
   ]
 }

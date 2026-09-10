@@ -90,7 +90,7 @@ describe('ficheiro JSON de gastos', () => {
     expect(await restarted.getHouseholdProfile(userA)).toMatchObject({ adults: 2, dependents: 1 })
     expect(await restarted.listMonthlySpendPeriods(userA)).toEqual([created])
     const stored = JSON.parse(await readFile(file, 'utf8'))
-    expect(stored).toMatchObject({ version: 3 })
+    expect(stored).toMatchObject({ version: 4, savingsGoals: [] })
     expect(stored.householdProfiles).toHaveLength(1)
     expect(stored.monthlySpendPeriods).toHaveLength(1)
     expect(stored.anonymousCohortAggregates).toEqual([])
