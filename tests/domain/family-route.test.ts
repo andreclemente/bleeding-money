@@ -169,6 +169,23 @@ describe('Rota Familiar', () => {
     expect(buildFamilyRoute({ ...base, findings: [] }).nextAction).toMatchObject({ kind: 'insurance_renewal', daysUntil: 45 })
   })
 
+  it('propõe ligar reduções confirmadas a um objetivo ainda por definir', () => {
+    const actions: SavingAction[] = [{ id: 'action-1', findingId: 'resolved', previousCostCents: 4599, newCostCents: 3599, actionDate: '2026-09-02', annualSavingCents: 12000, createdAt: '2026-09-02T00:00:00.000Z' }]
+
+    const route = buildFamilyRoute({
+      civilDate: '2026-09-09',
+      expenses: [expense('contract')],
+      findings: [],
+      actions,
+      periods: [],
+      goal: null
+    })
+
+    expect(route.nextAction).toEqual({ kind: 'define_goal', confirmedAnnualCents: 12000 })
+    expect(route.confirmedAnnualCents).toBe(12000)
+    expect(route.goal).toBeNull()
+  })
+
   it('propõe factos, construção de histórico e estado vazio sem fabricar perda', () => {
     const factual = finding('factual', 'contract', {
       estimatedMonthlySavingMinCents: 0,

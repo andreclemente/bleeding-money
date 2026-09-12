@@ -7,6 +7,7 @@ export type FamilyRouteAction =
   | { kind: 'estimated_finding', expenseId: string, findingId: string }
   | { kind: 'spending_limit_experiment', periodId: string, conditionalAnnualCents: number }
   | { kind: 'factual_finding', expenseId: string, findingId: string }
+  | { kind: 'define_goal', confirmedAnnualCents: number }
   | { kind: 'build_own_history', recordedMonths: number, missingMonths: number }
   | { kind: 'clear' }
   | { kind: 'empty' }
@@ -99,6 +100,7 @@ export const buildFamilyRoute = (input: FamilyRouteInput) => {
     : 0
   const plan = latestPeriod ? calculateMoneyAtRisk(latestPeriod.amounts) : null
   const conditionalAnnualPlanCents = plan?.annualCents || 0
+  const confirmedAnnualCents = input.actions.reduce((sum, action) => addMoney(sum, action.annualSavingCents), 0)
   const renewals = renewalCandidates(input.expenses, input.civilDate)
   const urgentRenewal = renewals.find(item => item.daysUntil <= 15)
   const laterRenewal = renewals.find(item => item.daysUntil >= 16)
@@ -111,6 +113,7 @@ export const buildFamilyRoute = (input: FamilyRouteInput) => {
   else if (laterRenewal) nextAction = { kind: 'insurance_renewal', ...laterRenewal }
   else if (latestPeriod && conditionalAnnualPlanCents > 0) nextAction = { kind: 'spending_limit_experiment', periodId: latestPeriod.id, conditionalAnnualCents: conditionalAnnualPlanCents }
   else if (factualCase) nextAction = { kind: 'factual_finding', expenseId: factualCase.expense.id, findingId: factualCase.finding.id }
+  else if (!input.goal && confirmedAnnualCents > 0) nextAction = { kind: 'define_goal', confirmedAnnualCents }
   else if (latestPeriod && comparableMonths < 3) nextAction = { kind: 'build_own_history', recordedMonths: comparableMonths, missingMonths: 3 - comparableMonths }
   else if (!input.expenses.length && !periods.length) nextAction = { kind: 'empty' }
   else nextAction = { kind: 'clear' }
@@ -119,7 +122,7 @@ export const buildFamilyRoute = (input: FamilyRouteInput) => {
     civilDate: input.civilDate,
     nextAction,
     monthlyRecurringConfirmedCents: input.expenses.reduce((sum, expense) => addMoney(sum, expense.monthlyCostCents), 0),
-    confirmedAnnualCents: input.actions.reduce((sum, action) => addMoney(sum, action.annualSavingCents), 0),
+    confirmedAnnualCents,
     identifiedMonthlyRangeCents,
     conditionalAnnualPlanCents,
     lastUpdatedAt: [...input.expenses.map(item => item.updatedAt), ...input.periods.map(item => item.updatedAt)].sort().at(-1) || null,

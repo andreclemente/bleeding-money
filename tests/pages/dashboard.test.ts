@@ -17,6 +17,15 @@ describe('Hoje', () => {
     expect(page).not.toContain('goal-callout')
   })
 
+  it('oferece definir um objetivo sem confundir redução confirmada com dinheiro depositado', async () => {
+    const page = await readFile(new URL('../../pages/dashboard.vue', import.meta.url), 'utf8')
+
+    expect(page).toContain("action.kind === 'define_goal'")
+    expect(page).toContain('Dar um destino às reduções confirmadas')
+    expect(page).toContain('Não representa dinheiro já depositado')
+    expect(page).toContain("href: '/savings-goal'")
+  })
+
   it('distingue estimativa, confirmado e evidência e descreve atualização manual', async () => {
     const page = await readFile(new URL('../../pages/dashboard.vue', import.meta.url), 'utf8')
 
