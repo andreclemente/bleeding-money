@@ -224,13 +224,39 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 
 .detail-hero { display: flex; justify-content: space-between; gap: 30px; padding: 26px; margin-bottom: 18px }
 .detail-hero h1 { margin: 6px 0 5px; font-size: 2rem }
-.detail-price { text-align: right }
+.detail-price { min-width: 230px; text-align: right }
 .detail-price strong { display: block; font-size: 1.8rem; letter-spacing: -.04em }
 .detail-price span { color: var(--bm-muted); font-size: .76rem }
+.detail-annual { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--bm-border) }
+.detail-annual b, .detail-annual span { display: block }
+.detail-annual b { font-size: 1rem; font-weight: 700 }
 .detail-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .65fr); gap: 18px }
 .panel-header { padding: 20px 22px; border-bottom: 1px solid var(--bm-border) }
 .panel-header h2 { margin: 0 }
-.diagnosis { padding: 24px }
+.lifecycle-panel .panel-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px }
+.evidence-rule { max-width: 230px; color: var(--bm-muted); font-size: .7rem; line-height: 1.45; text-align: right }
+.expense-lifecycle { margin: 0; padding: 8px 24px 12px; list-style: none }
+.expense-lifecycle li { position: relative; display: grid; grid-template-columns: 18px 1fr; gap: 14px; padding: 18px 0 }
+.expense-lifecycle li:not(:last-child)::after { position: absolute; top: 31px; bottom: -13px; left: 6px; width: 1px; background: var(--bm-border); content: '' }
+.lifecycle-marker { position: relative; z-index: 1; width: 13px; height: 13px; margin-top: 3px; border: 3px solid var(--bm-surface); border-radius: 50%; background: var(--bm-primary); box-shadow: 0 0 0 1px var(--bm-primary) }
+.lifecycle-entry>div { display: flex; align-items: baseline; justify-content: space-between; gap: 18px }
+.lifecycle-entry time { color: var(--bm-muted); font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em }
+.lifecycle-entry strong { font-size: 1.08rem }
+.lifecycle-entry p { margin: 4px 0 9px; color: var(--bm-ink-soft); font-size: .82rem }
+.change-note { display: inline-flex; padding: 5px 8px; border-radius: 6px; color: var(--bm-muted); background: var(--bm-surface-soft); font-size: .7rem; font-weight: 700 }
+.change-note--increase { color: var(--bm-danger); background: var(--bm-danger-soft) }
+.change-note--reduction { color: var(--bm-success); background: var(--bm-success-soft) }
+.lifecycle-empty { padding: 28px 24px }
+.lifecycle-empty p { max-width: 560px; margin: 7px 0 0; color: var(--bm-muted); line-height: 1.55 }
+.detail-sidebar { display: grid; align-content: start; gap: 18px }
+.decision-dates, .diagnosis { padding: 24px }
+.decision-dates h2 { margin: 5px 0 8px }
+.decision-dates>p { margin: 0 0 18px; color: var(--bm-muted); font-size: .8rem; line-height: 1.5 }
+.decision-dates dl { margin: 0 }
+.decision-dates dl>div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--bm-border) }
+.decision-dates dt { color: var(--bm-muted); font-size: .75rem }
+.decision-dates dd { margin: 0; font-size: .78rem; font-weight: 700; text-align: right }
+.missing-decision-date { padding: 12px; color: var(--bm-ink-soft); background: var(--bm-surface-soft); font-size: .78rem; line-height: 1.5 }
 .health-indicator { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; font-weight: 600 }
 .health-indicator .status-dot { width: 11px; height: 11px }
 .health-indicator--attention { color: var(--bm-warning) }

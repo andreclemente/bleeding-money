@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -32,6 +33,13 @@ const policyTypes = { car: 'Automóvel', home: 'Casa', health: 'Saúde', life: '
 const coverageLabels: Record<InsuranceCoverageCode, string> = { civil_liability: 'Responsabilidade civil', own_damage: 'Danos próprios', building: 'Edifício', contents: 'Conteúdo/recheio', hospitalization: 'Hospitalização', outpatient: 'Ambulatório', death: 'Morte', disability: 'Invalidez', travel_assistance: 'Assistência em viagem' }
 const policyLabel = (details: InsuranceDetails) => policyTypes[details.policyType]
 const coverageText = (details: InsuranceDetails) => details.coverageCodes.length ? details.coverageCodes.map(code => coverageLabels[code]).join(', ') : 'Não declaradas'
+const lifecycle = computed(() => data.value ? buildExpenseLifecycle(data.value.expense, data.value.snapshots) : null)
+const percentage = (basisPoints: number) => new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.abs(basisPoints) / 100)
+const changeLabel = (change: { cents: number, basisPoints: number } | null) => {
+  if (!change) return 'Primeiro valor registado'
+  if (change.cents === 0) return 'Sem alteração face ao registo anterior'
+  return `${change.cents > 0 ? 'Aumento' : 'Redução'} de ${money(Math.abs(change.cents))} (${percentage(change.basisPoints)}%)`
+}
 </script>
 
 <template>
@@ -88,6 +96,10 @@ const coverageText = (details: InsuranceDetails) => details.coverageCodes.length
         <div class="detail-price">
           <strong>{{ money(data.expense.monthlyCostCents) }}</strong>
           <span>Custo recorrente / mês</span>
+          <div class="detail-annual">
+            <b>{{ money(lifecycle!.annualEquivalentCents) }}</b>
+            <span>Equivalente anual · não é uma cobrança adicional</span>
+          </div>
         </div>
       </header>
 
@@ -118,95 +130,125 @@ const coverageText = (details: InsuranceDetails) => details.coverageCodes.length
 
       <div class="detail-grid">
         <section
-          class="panel"
-          aria-labelledby="history-heading"
+          class="panel lifecycle-panel"
+          aria-labelledby="lifecycle-heading"
         >
           <div class="panel-header">
-            <h2 id="history-heading">
-              Histórico de preço
-            </h2>
+            <div>
+              <div class="section-kicker">
+                Evidência registada
+              </div>
+              <h2 id="lifecycle-heading">
+                Linha de vida da despesa
+              </h2>
+            </div>
+            <span class="evidence-rule">Variação confirmada apenas entre valores observados</span>
           </div>
-          <div v-if="data.snapshots.length">
-            <table class="expense-table">
-              <thead>
-                <tr>
-                  <th>Data observada</th>
-                  <th>Plano</th>
-                  <th class="money-cell">
-                    Preço
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="row in data.snapshots"
-                  :key="row.id"
-                >
-                  <td>{{ date(row.observedAt) }}</td>
-                  <td>{{ row.plan || 'Sem plano indicado' }}</td>
-                  <td class="money-cell">
-                    {{ money(row.priceCents) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <ol
+            v-if="lifecycle!.observations.length"
+            class="expense-lifecycle"
+          >
+            <li
+              v-for="observation in lifecycle!.observations"
+              :key="observation.snapshot.id"
+            >
+              <span
+                class="lifecycle-marker"
+                aria-hidden="true"
+              />
+              <div class="lifecycle-entry">
+                <div>
+                  <time :datetime="observation.snapshot.observedAt">{{ date(observation.snapshot.observedAt) }}</time>
+                  <strong>{{ money(observation.snapshot.priceCents) }}</strong>
+                </div>
+                <p>{{ observation.snapshot.plan || 'Sem plano indicado' }} · valor observado</p>
+                <span
+                  class="change-note"
+                  :class="{ 'change-note--increase': observation.change && observation.change.cents > 0, 'change-note--reduction': observation.change && observation.change.cents < 0 }"
+                >{{ changeLabel(observation.change) }}</span>
+              </div>
+            </li>
+          </ol>
           <div
             v-else
-            class="empty-state"
+            class="lifecycle-empty"
           >
-            <div>
-              <span
-                class="empty-state-icon"
-                aria-hidden="true"
-              >⌁</span>
-              <h2>Ainda sem histórico</h2>
-              <p>As alterações de preço aparecerão aqui quando forem detetadas.</p>
-            </div>
+            <strong>Ainda sem valores anteriores</strong>
+            <p>O custo atual está registado, mas ainda não existe outro valor observado para confirmar uma variação.</p>
           </div>
         </section>
 
-        <aside
-          class="panel diagnosis"
-          aria-labelledby="diagnosis-heading"
-        >
-          <div class="section-kicker">
-            Diagnóstico
-          </div>
-          <div
-            id="diagnosis-heading"
-            class="health-indicator"
-            :class="{ 'health-indicator--attention': openFindings.length }"
+        <div class="detail-sidebar">
+          <aside
+            class="panel decision-dates"
+            aria-labelledby="decision-dates-heading"
           >
-            <span
-              class="status-dot"
-              aria-hidden="true"
-            />
-            {{ openFindings.length ? 'Atenção necessária' : 'Despesa saudável' }}
-          </div>
-          <p v-if="openFindings.length">
-            Encontrámos {{ openFindings.length }} {{ openFindings.length === 1 ? 'oportunidade que merece' : 'oportunidades que merecem' }} a tua decisão.
-          </p>
-          <p v-else>
-            Não existem recomendações abertas para esta despesa neste momento.
-          </p>
-          <v-btn
-            v-if="openFindings.length"
-            :to="`/findings?open=${openFindings[0].id}`"
-            color="primary"
-            block
+            <div class="section-kicker">
+              Agenda contratual
+            </div>
+            <h2 id="decision-dates-heading">
+              Datas para decidir
+            </h2>
+            <p>Renovação, fidelização e fim de contrato são eventos diferentes.</p>
+            <dl v-if="lifecycle!.decisionDates.length">
+              <div
+                v-for="event in lifecycle!.decisionDates"
+                :key="`${event.kind}-${event.date}`"
+              >
+                <dt>{{ event.label }}</dt>
+                <dd>{{ date(event.date) }}</dd>
+              </div>
+            </dl>
+            <div
+              v-else
+              class="missing-decision-date"
+            >
+              Sem prazo declarado. Não assumimos uma data.
+            </div>
+          </aside>
+
+          <aside
+            class="panel diagnosis"
+            aria-labelledby="diagnosis-heading"
           >
-            Rever {{ openFindings.length === 1 ? 'recomendação' : 'recomendações' }}
-          </v-btn>
-          <v-btn
-            v-else
-            to="/findings"
-            variant="outlined"
-            block
-          >
-            Ver recomendações
-          </v-btn>
-        </aside>
+            <div class="section-kicker">
+              Diagnóstico
+            </div>
+            <div
+              id="diagnosis-heading"
+              class="health-indicator"
+              :class="{ 'health-indicator--attention': openFindings.length }"
+            >
+              <span
+                class="status-dot"
+                aria-hidden="true"
+              />
+              {{ openFindings.length ? 'Atenção necessária' : 'Despesa saudável' }}
+            </div>
+            <p v-if="openFindings.length">
+              Encontrámos {{ openFindings.length }} {{ openFindings.length === 1 ? 'oportunidade que merece' : 'oportunidades que merecem' }} a tua decisão.
+            </p>
+            <p v-else>
+              Não existem recomendações abertas para esta despesa neste momento.
+            </p>
+            <v-btn
+              v-if="openFindings.length"
+              :to="`/findings?open=${openFindings[0].id}`"
+              color="primary"
+              block
+            >
+              Rever {{ openFindings.length === 1 ? 'recomendação' : 'recomendações' }}
+            </v-btn>
+            <v-btn
+              v-else
+              to="/findings"
+              variant="outlined"
+              block
+            >
+              Ver recomendações
+            </v-btn>
+          </aside>
+        </div>
       </div>
     </template>
   </div>

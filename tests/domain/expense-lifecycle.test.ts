@@ -1,0 +1,71 @@
+import { describe, expect, it } from 'vitest'
+import { buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
+
+const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
+  id: 'expense-1',
+  userId: 'user-1',
+  category: 'telecom',
+  provider: 'Fornecedor',
+  productName: 'Fibra',
+  monthlyCostCents: 4890,
+  billingFrequency: 'monthly',
+  currency: 'EUR',
+  contractStartDate: '2024-01-01',
+  commitmentEndDate: '2026-04-01',
+  details: { kind: 'telecom', connectionType: 'fiber', downloadSpeedMbps: 500 },
+  createdAt: '2024-01-01T12:00:00.000Z',
+  updatedAt: '2026-08-01T12:00:00.000Z',
+  ...overrides
+})
+
+const snapshot = (id: string, observedAt: string, priceCents: number): ExpenseSnapshot => ({
+  id,
+  expenseId: 'expense-1',
+  observedAt,
+  priceCents,
+  plan: 'Fibra 500',
+  properties: {},
+  source: 'manual'
+})
+
+describe('linha de vida da despesa', () => {
+  it('ordena observações e calcula apenas variações confirmadas entre valores registados', () => {
+    const lifecycle = buildExpenseLifecycle(expense(), [
+      snapshot('latest', '2026-08-01', 4890),
+      snapshot('first', '2024-01-01', 3690),
+      snapshot('middle', '2025-07-01', 4190)
+    ])
+
+    expect(lifecycle.annualEquivalentCents).toBe(58_680)
+    expect(lifecycle.observations.map(item => item.snapshot.id)).toEqual(['first', 'middle', 'latest'])
+    expect(lifecycle.observations.map(item => item.change)).toEqual([
+      null,
+      { cents: 500, basisPoints: 1355 },
+      { cents: 700, basisPoints: 1671 }
+    ])
+  })
+
+  it('separa renovação, fim de fidelização e fim de contrato sem inventar datas', () => {
+    const insurance = expense({
+      category: 'insurance',
+      commitmentEndDate: '2026-03-01',
+      contractEndDate: '2026-12-31',
+      details: { kind: 'insurance', policyType: 'home', renewalDate: '2026-11-15', coverageCodes: ['building'] }
+    })
+
+    expect(buildExpenseLifecycle(insurance, []).decisionDates).toEqual([
+      { kind: 'commitment', label: 'Fim da fidelização', date: '2026-03-01' },
+      { kind: 'renewal', label: 'Próxima renovação', date: '2026-11-15' },
+      { kind: 'contract', label: 'Fim do contrato', date: '2026-12-31' }
+    ])
+  })
+
+  it('mantém a linha de vida honesta quando ainda não existe histórico', () => {
+    const lifecycle = buildExpenseLifecycle(expense({ monthlyCostCents: 1199, contractStartDate: undefined, commitmentEndDate: undefined }), [])
+
+    expect(lifecycle.observations).toEqual([])
+    expect(lifecycle.decisionDates).toEqual([])
+    expect(lifecycle.annualEquivalentCents).toBe(14_388)
+  })
+})
