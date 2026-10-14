@@ -25,6 +25,12 @@ export type ContractDecisionSignal = {
   action: string
 }
 
+export type ContractDecisionDossier = {
+  title: string
+  evidence: string[]
+  rule: string
+}
+
 const civilDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 const dayMs = 86_400_000
 
@@ -33,6 +39,45 @@ const actionFor = (event: ExpenseDecisionDate) => {
   if (event.kind === 'commitment') return 'Confirma se já podes renegociar ou mudar de fornecedor.'
   return 'Confirma as condições de termo ou continuação do contrato.'
 }
+
+const decisionEvidence: Record<RecurringExpense['category'], string[]> = {
+  electricity: [
+    'Última fatura com o valor atual e a tarifa aplicada',
+    'Potência contratada e consumo anual indicado na fatura',
+    'Condições do contrato e data de termo, se estiver declarada'
+  ],
+  telecom: [
+    'Última fatura ou extrato com o valor atual',
+    'Resumo do contrato com fidelização e serviços incluídos',
+    'Linhas, equipamentos e extras que aparecem na fatura'
+  ],
+  bank: [
+    'Último extrato com as comissões cobradas',
+    'Preçário aplicável à conta e aos cartões',
+    'Serviços associados que condicionam a comissão'
+  ],
+  subscription: [
+    'Última cobrança com o valor atual',
+    'Plano e funcionalidades atualmente incluídas',
+    'Utilização recente declarada antes de decidir manter ou cancelar'
+  ],
+  gym: [
+    'Último recibo com o valor atual',
+    'Condições de cancelamento e fidelização',
+    'Serviços incluídos na mensalidade atual'
+  ],
+  insurance: [
+    'Último recibo ou aviso com o prémio atual',
+    'Condições particulares com capitais, coberturas, exclusões e franquias',
+    'Aviso de renovação, se já foi recebido'
+  ]
+}
+
+export const buildContractDecisionDossier = (expense: RecurringExpense): ContractDecisionDossier => ({
+  title: 'Leva estes factos para a conversa',
+  evidence: structuredClone(decisionEvidence[expense.category]),
+  rule: 'Serve para confirmar condições. Não estima nem confirma poupanças.'
+})
 
 export const buildContractDecisionSignal = (events: ExpenseDecisionDate[], civilDate: string): ContractDecisionSignal | null => {
   const today = civilDay(civilDate)

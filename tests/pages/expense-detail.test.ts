@@ -45,4 +45,13 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/decisionSignal\.action/)
     expect(page).toMatch(/Não altera custos nem confirma poupanças/i)
   })
+
+  it('mostra um dossiê curto de factos para preparar a conversa com o fornecedor', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/buildContractDecisionDossier/)
+    expect(page).toMatch(/Preparar a decisão/i)
+    expect(page).toMatch(/decisionDossier\.evidence/)
+    expect(page).toMatch(/decisionDossier\.rule/)
+  })
 })

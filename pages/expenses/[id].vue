@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
-import { buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import { buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -38,6 +38,7 @@ const lifecycle = computed(() => data.value ? buildExpenseLifecycle(data.value.e
 const today = new Date()
 const currentCivilDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 const decisionSignal = computed(() => lifecycle.value ? buildContractDecisionSignal(lifecycle.value.decisionDates, currentCivilDate) : null)
+const decisionDossier = computed(() => data.value ? buildContractDecisionDossier(data.value.expense) : null)
 const percentage = (basisPoints: number) => new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.abs(basisPoints) / 100)
 const changeLabel = (change: { cents: number, basisPoints: number } | null) => {
   if (!change) return 'Primeiro valor registado'
@@ -352,6 +353,22 @@ const saveAgenda = async () => {
                 <b>{{ decisionSignal.timingLabel }}</b>
                 <p>{{ decisionSignal.action }}</p>
                 <small>Não altera custos nem confirma poupanças.</small>
+              </div>
+              <div
+                v-if="decisionDossier"
+                class="decision-dossier"
+              >
+                <span>Preparar a decisão</span>
+                <strong>{{ decisionDossier.title }}</strong>
+                <ul>
+                  <li
+                    v-for="item in decisionDossier.evidence"
+                    :key="item"
+                  >
+                    {{ item }}
+                  </li>
+                </ul>
+                <small>{{ decisionDossier.rule }}</small>
               </div>
               <dl v-if="lifecycle!.decisionDates.length">
                 <div

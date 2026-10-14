@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import { buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -99,5 +99,30 @@ describe('linha de vida da despesa', () => {
       action: 'Confirma o estado atual do contrato e corrige a data se renovou.'
     })
     expect(buildContractDecisionSignal([], '2026-10-14')).toBeNull()
+  })
+
+  it('prepara a decisão de telecomunicações apenas com evidência do contrato atual', () => {
+    expect(buildContractDecisionDossier(expense())).toEqual({
+      title: 'Leva estes factos para a conversa',
+      evidence: [
+        'Última fatura ou extrato com o valor atual',
+        'Resumo do contrato com fidelização e serviços incluídos',
+        'Linhas, equipamentos e extras que aparecem na fatura'
+      ],
+      rule: 'Serve para confirmar condições. Não estima nem confirma poupanças.'
+    })
+  })
+
+  it('torna a preparação de seguros auditável por coberturas e condições', () => {
+    const insurance = expense({
+      category: 'insurance',
+      details: { kind: 'insurance', policyType: 'home', renewalDate: '2026-11-15', coverageCodes: ['building'] }
+    })
+
+    expect(buildContractDecisionDossier(insurance).evidence).toEqual([
+      'Último recibo ou aviso com o prémio atual',
+      'Condições particulares com capitais, coberturas, exclusões e franquias',
+      'Aviso de renovação, se já foi recebido'
+    ])
   })
 })
