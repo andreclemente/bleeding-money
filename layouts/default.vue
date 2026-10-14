@@ -22,10 +22,7 @@ const logout = async () => {
         to="/dashboard"
         aria-label="BleedingMoney — Hoje"
       >
-        <span
-          class="brand-mark"
-          aria-hidden="true"
-        >BM</span><span>BleedingMoney</span>
+        <span class="brand-wordmark">bleeding<span>/money</span></span>
       </NuxtLink>
       <p class="workspace-label">
         Caderno familiar privado
@@ -90,10 +87,7 @@ const logout = async () => {
           class="brand"
           to="/dashboard"
         >
-          <span
-            class="brand-mark"
-            aria-hidden="true"
-          >BM</span><span>BleedingMoney</span>
+          <span class="brand-wordmark">bleeding<span>/money</span></span>
         </NuxtLink>
         <button
           class="mobile-logout"

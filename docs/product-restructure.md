@@ -43,3 +43,15 @@ Esta fase não inclui:
 - reescrita integral das rotas existentes
 
 As rotas atuais continuam funcionais; a navegação principal apenas realça as quatro tarefas: Hoje, Registar, Contratos e Objetivo. Método, privacidade e arquivo permanecem acessíveis como navegação secundária.
+
+## Evolução operacional
+
+A superfície principal passa de **Monitor** para **Operate**: não abre com um conjunto de cartões nem com métricas decorativas. Abre com uma bancada de decisão que explica uma única prioridade e o seu impacto possível no objetivo.
+
+Três instrumentos tornam o produto reconhecível e útil sem novas fontes de dados:
+
+1. **Impacto no objetivo** — mostra quanto um caso aberto poderia alterar a meta, sempre como intervalo condicional e sem mover o progresso confirmado.
+2. **Radar 45 dias** — transforma datas reais de renovação de seguros numa fila temporal acionável antes do prazo.
+3. **Ponte decisão → objetivo** — torna visível o percurso Identificar → Confirmar → Direcionar e separa visualmente hipótese de resultado.
+
+A linguagem visual é uma bancada de auditoria: grelha produtiva, superfícies planas, alto contraste, tipografia técnica e uma única cor interativa. Evita beige editorial, cartões arredondados repetidos, ícones decorativos, sombras e hierarquia de dashboard genérico.

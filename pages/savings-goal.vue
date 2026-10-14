@@ -1,15 +1,31 @@
 <script setup lang="ts">
+import type { FamilyRoute } from '../domain/family-route'
 import type { SavingsGoalProgress } from '../domain/savings-goal'
 
 const requestFetch = useRequestFetch()
-const response = await requestFetch<{ goal: SavingsGoalProgress | null }>('/api/savings-goal')
-const goal = ref(response.goal)
+const [goalResponse, route] = await Promise.all([
+  requestFetch<{ goal: SavingsGoalProgress | null }>('/api/savings-goal'),
+  requestFetch<FamilyRoute>('/api/dashboard')
+])
+const goal = ref(goalResponse.goal)
 const editing = ref(!goal.value)
 const saving = ref(false)
 const error = ref('')
 const name = ref(goal.value?.name || '')
 const targetEuros = ref(goal.value ? (goal.value.targetAnnualCents / 100).toFixed(2) : '')
 const money = (cents: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(cents / 100)
+const percentage = (value: number, target: number) => target > 0 ? Math.min(100, Math.round(value / target * 100)) : 0
+const scenario = computed(() => {
+  if (!goal.value || !route.identifiedMonthlyRangeCents.maxCents) return null
+  const minAnnual = route.identifiedMonthlyRangeCents.minCents * 12
+  const maxAnnual = route.identifiedMonthlyRangeCents.maxCents * 12
+  return {
+    minAnnual,
+    maxAnnual,
+    minPercentage: percentage(goal.value.confirmedAnnualCents + minAnnual, goal.value.targetAnnualCents),
+    maxPercentage: percentage(goal.value.confirmedAnnualCents + maxAnnual, goal.value.targetAnnualCents)
+  }
+})
 
 const save = async () => {
   error.value = ''
@@ -34,19 +50,19 @@ const save = async () => {
 
 <template>
   <div class="goal-page">
-    <header class="page-header">
+    <header class="page-header goal-header">
       <div class="page-header-copy">
         <div class="section-kicker">
-          Progresso confirmado
+          Destino das decisões
         </div>
-        <h1>Objetivo familiar</h1>
+        <h1>Objetivo</h1>
         <p class="page-subtitle">
-          Liga um objetivo concreto às reduções anuais que já concluíste. Só contam reduções que confirmaste como concluídas — recomendações e limites planeados não avançam a barra.
+          Só contam reduções que confirmaste como concluídas.
         </p>
       </div>
       <button
         v-if="goal && !editing"
-        class="secondary-action"
+        class="header-action header-action--light"
         type="button"
         @click="editing = true"
       >
@@ -54,45 +70,76 @@ const save = async () => {
       </button>
     </header>
 
-    <section
-      v-if="goal && !editing"
-      class="panel goal-progress"
-      aria-labelledby="goal-title"
-    >
-      <div class="goal-progress__heading">
-        <div>
-          <span class="data-label">Objetivo anual</span><h2 id="goal-title">
+    <template v-if="goal && !editing">
+      <section
+        class="goal-command"
+        aria-labelledby="goal-title"
+      >
+        <div class="goal-command__main">
+          <span class="data-label">Poupança anual confirmada</span>
+          <h2 id="goal-title">
             {{ goal.name }}
           </h2>
+          <strong>{{ goal.percentage }}%</strong>
+          <div
+            class="goal-track"
+            role="progressbar"
+            :aria-label="`Progresso de ${goal.name}`"
+            :aria-valuenow="goal.percentage"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <span :style="{ width: `${goal.percentage}%` }" />
+          </div>
+          <p>{{ money(goal.confirmedAnnualCents) }} de {{ money(goal.targetAnnualCents) }} em reduções anuais confirmadas.</p>
         </div>
-        <strong>{{ goal.percentage }}%</strong>
-      </div>
-      <div
-        class="goal-track"
-        role="progressbar"
-        :aria-label="`Progresso de ${goal.name}`"
-        :aria-valuenow="goal.percentage"
-        aria-valuemin="0"
-        aria-valuemax="100"
+        <div class="goal-command__remaining">
+          <span>Falta confirmar</span>
+          <strong>{{ money(goal.remainingAnnualCents) }}</strong>
+          <small>por confirmar até à meta</small>
+        </div>
+      </section>
+
+      <section
+        class="goal-bridge"
+        aria-labelledby="bridge-title"
       >
-        <span :style="{ width: `${goal.percentage}%` }" />
-      </div>
-      <dl class="goal-numbers">
-        <div><dt>Poupança anual confirmada</dt><dd>{{ money(goal.confirmedAnnualCents) }}</dd></div>
-        <div><dt>Falta confirmar</dt><dd>{{ money(goal.remainingAnnualCents) }}</dd></div>
-        <div><dt>Meta anual</dt><dd>{{ money(goal.targetAnnualCents) }}</dd></div>
-      </dl>
-      <p class="goal-method">
-        O progresso soma apenas a redução anual registada quando concluis uma recomendação com um novo custo real. Não representa dinheiro já depositado numa conta.
-      </p>
-    </section>
+        <div>
+          <span class="data-label">Ponte entre decisões e objetivo</span>
+          <h2 id="bridge-title">
+            O que pode mudar a seguir
+          </h2>
+        </div>
+        <template v-if="scenario">
+          <div class="goal-scenario-value">
+            <strong>{{ scenario.minPercentage }}–{{ scenario.maxPercentage }}%</strong><span>se os casos abertos forem confirmados dentro do intervalo</span>
+          </div>
+          <p><strong>{{ money(scenario.minAnnual) }}–{{ money(scenario.maxAnnual) }}/ano</strong> continuam a ser uma estimativa. Não alteram a barra acima até existir um novo custo real.</p>
+        </template>
+        <div
+          v-else
+          class="decision-empty"
+        >
+          <strong>Sem cenário por confirmar</strong><p>A próxima melhoria aparecerá aqui quando existir um caso com intervalo estimado.</p>
+        </div>
+      </section>
+
+      <section
+        class="goal-proof"
+        aria-label="Como é calculado o progresso"
+      >
+        <div><span>01</span><strong>Identificar</strong><small>Um caso pode ter um intervalo, nunca um resultado presumido.</small></div>
+        <div><span>02</span><strong>Confirmar</strong><small>Registas o novo custo depois de agir.</small></div>
+        <div><span>03</span><strong>Direcionar</strong><small>A redução anual passa a contar para esta meta.</small></div>
+      </section>
+    </template>
 
     <form
       v-else
-      class="panel goal-form"
+      class="goal-form goal-form--focused"
       @submit.prevent="save"
     >
-      <div><span class="data-label">Um destino concreto</span><h2>{{ goal ? 'Ajustar objetivo' : 'Criar objetivo' }}</h2><p>Exemplos: reserva familiar, fundo de emergência ou margem anual. Define quanto queres reduzir por ano.</p></div>
+      <div><span class="data-label">Um destino concreto</span><h2>{{ goal ? 'Ajustar objetivo' : 'Criar objetivo' }}</h2><p>Exemplos: reserva familiar, fundo de emergência ou margem anual.</p></div>
       <label>Nome do objetivo<input
         v-model="name"
         maxlength="80"

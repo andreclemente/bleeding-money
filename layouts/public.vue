@@ -5,10 +5,7 @@
         class="brand"
         to="/how-it-works"
       >
-        <span
-          class="brand-mark"
-          aria-hidden="true"
-        >BM</span><span>BleedingMoney</span>
+        <span class="brand-wordmark">bleeding<span>/money</span></span>
       </NuxtLink>
       <NuxtLink
         class="text-link"
