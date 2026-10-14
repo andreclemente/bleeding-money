@@ -31,6 +31,14 @@ export type ContractDecisionDossier = {
   rule: string
 }
 
+export type ContractCallGuide = {
+  currentMonthlyCents: number
+  annualEquivalentCents: number
+  nextDeclaredDate: ExpenseDecisionDate | null
+  questions: string[]
+  rule: string
+}
+
 const civilDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 const dayMs = 86_400_000
 
@@ -73,10 +81,51 @@ const decisionEvidence: Record<RecurringExpense['category'], string[]> = {
   ]
 }
 
+const callQuestions: Record<RecurringExpense['category'], string[]> = {
+  electricity: [
+    'Qual é o preço final da energia e da potência contratada?',
+    'Que descontos existem, durante quanto tempo e com que condições?',
+    'Existe fidelização, serviço adicional ou penalização de saída?'
+  ],
+  telecom: [
+    'Qual é o preço final mensal, já com equipamentos e extras?',
+    'Que serviços, linhas e velocidades ficam incluídos?',
+    'Existe nova fidelização e qual é a data exata de termo?'
+  ],
+  bank: [
+    'Qual é a comissão total mensal e anual da conta?',
+    'Que cartões, transferências e serviços ficam incluídos?',
+    'Que condições podem alterar ou eliminar a comissão?'
+  ],
+  subscription: [
+    'Qual é o preço final do plano e quando volta a ser cobrado?',
+    'Que funcionalidades ficam incluídas ou são retiradas?',
+    'Como e até quando posso cancelar sem nova cobrança?'
+  ],
+  gym: [
+    'Qual é o preço final mensal e que serviços inclui?',
+    'Existe fidelização ou taxa de cancelamento?',
+    'Qual é o procedimento e o prazo exato para cancelar?'
+  ],
+  insurance: [
+    'Qual é o prémio final e a periodicidade de pagamento?',
+    'Que capitais, coberturas, exclusões e franquias ficam contratados?',
+    'Qual é a data de renovação e o prazo para alterar ou denunciar?'
+  ]
+}
+
 export const buildContractDecisionDossier = (expense: RecurringExpense): ContractDecisionDossier => ({
   title: 'Leva estes factos para a conversa',
   evidence: structuredClone(decisionEvidence[expense.category]),
   rule: 'Serve para confirmar condições. Não estima nem confirma poupanças.'
+})
+
+export const buildContractCallGuide = (expense: RecurringExpense, decisionDates: ExpenseDecisionDate[]): ContractCallGuide => ({
+  currentMonthlyCents: expense.monthlyCostCents,
+  annualEquivalentCents: expense.monthlyCostCents * 12,
+  nextDeclaredDate: decisionDates.length ? structuredClone([...decisionDates].sort((left, right) => left.date.localeCompare(right.date))[0]!) : null,
+  questions: structuredClone(callQuestions[expense.category]),
+  rule: 'Regista a resposta como proposta. Só um novo custo aceite e observado confirma poupança.'
 })
 
 export const buildContractDecisionSignal = (events: ExpenseDecisionDate[], civilDate: string): ContractDecisionSignal | null => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -124,5 +124,22 @@ describe('linha de vida da despesa', () => {
       'Condições particulares com capitais, coberturas, exclusões e franquias',
       'Aviso de renovação, se já foi recebido'
     ])
+  })
+
+  it('cria um guião de chamada com factos atuais e perguntas, sem calcular poupanças', () => {
+    expect(buildContractCallGuide(expense(), [
+      { kind: 'commitment', label: 'Fim da fidelização', date: '2026-04-01' },
+      { kind: 'contract', label: 'Fim do contrato', date: '2027-01-31' }
+    ])).toEqual({
+      currentMonthlyCents: 4890,
+      annualEquivalentCents: 58_680,
+      nextDeclaredDate: { kind: 'commitment', label: 'Fim da fidelização', date: '2026-04-01' },
+      questions: [
+        'Qual é o preço final mensal, já com equipamentos e extras?',
+        'Que serviços, linhas e velocidades ficam incluídos?',
+        'Existe nova fidelização e qual é a data exata de termo?'
+      ],
+      rule: 'Regista a resposta como proposta. Só um novo custo aceite e observado confirma poupança.'
+    })
   })
 })

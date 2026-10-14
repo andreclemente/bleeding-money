@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
-import { buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -39,6 +39,29 @@ const today = new Date()
 const currentCivilDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 const decisionSignal = computed(() => lifecycle.value ? buildContractDecisionSignal(lifecycle.value.decisionDates, currentCivilDate) : null)
 const decisionDossier = computed(() => data.value ? buildContractDecisionDossier(data.value.expense) : null)
+const callGuide = computed(() => data.value && lifecycle.value ? buildContractCallGuide(data.value.expense, lifecycle.value.decisionDates) : null)
+const callGuideStatus = ref('')
+const copyCallGuide = async () => {
+  if (!data.value || !callGuide.value) return
+  const guide = callGuide.value
+  const lines = [
+    `Contrato: ${data.value.expense.productName} · ${data.value.expense.provider}`,
+    `Custo atual declarado: ${money(guide.currentMonthlyCents)} / mês`,
+    `Equivalente anual: ${money(guide.annualEquivalentCents)}`,
+    guide.nextDeclaredDate ? `${guide.nextDeclaredDate.label}: ${date(guide.nextDeclaredDate.date)}` : 'Prazo contratual: não declarado',
+    '',
+    'Perguntas a confirmar:',
+    ...guide.questions.map((question: string, index: number) => `${index + 1}. ${question}`),
+    '',
+    guide.rule
+  ]
+  try {
+    await navigator.clipboard.writeText(lines.join('\n'))
+    callGuideStatus.value = 'Guião copiado.'
+  } catch {
+    callGuideStatus.value = 'Não foi possível copiar o guião.'
+  }
+}
 const percentage = (basisPoints: number) => new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.abs(basisPoints) / 100)
 const changeLabel = (change: { cents: number, basisPoints: number } | null) => {
   if (!change) return 'Primeiro valor registado'
@@ -369,6 +392,41 @@ const saveAgenda = async () => {
                   </li>
                 </ul>
                 <small>{{ decisionDossier.rule }}</small>
+              </div>
+              <div
+                v-if="callGuide"
+                class="call-guide"
+              >
+                <span>Guião para falar com o fornecedor</span>
+                <dl>
+                  <div><dt>Custo atual declarado</dt><dd>{{ money(callGuide.currentMonthlyCents) }} / mês</dd></div>
+                  <div><dt>Equivalente anual</dt><dd>{{ money(callGuide.annualEquivalentCents) }}</dd></div>
+                  <div><dt>Prazo a confirmar</dt><dd>{{ callGuide.nextDeclaredDate ? `${callGuide.nextDeclaredDate.label} · ${date(callGuide.nextDeclaredDate.date)}` : 'Não declarado' }}</dd></div>
+                </dl>
+                <strong>Perguntas a confirmar</strong>
+                <ol>
+                  <li
+                    v-for="question in callGuide.questions"
+                    :key="question"
+                  >
+                    {{ question }}
+                  </li>
+                </ol>
+                <small>{{ callGuide.rule }}</small>
+                <button
+                  class="secondary-action call-guide__copy"
+                  type="button"
+                  @click="copyCallGuide"
+                >
+                  Copiar guião
+                </button>
+                <p
+                  v-if="callGuideStatus"
+                  class="call-guide__status"
+                  role="status"
+                >
+                  {{ callGuideStatus }}
+                </p>
               </div>
               <dl v-if="lifecycle!.decisionDates.length">
                 <div

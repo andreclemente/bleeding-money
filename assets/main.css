@@ -273,6 +273,17 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .decision-dossier>strong { font-size: .82rem }
 .decision-dossier ul { display: grid; gap: 7px; margin: 2px 0; padding-left: 18px; color: var(--bm-ink-soft); font-size: .75rem; line-height: 1.4 }
 .decision-dossier>small { color: var(--bm-muted); font-size: .67rem; line-height: 1.4 }
+.call-guide { display: grid; gap: 10px; margin-bottom: 16px; padding: 14px; border: 1px solid var(--bm-border-strong); border-radius: 10px; background: var(--bm-surface) }
+.call-guide>span { color: var(--bm-muted); font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase }
+.call-guide dl { margin: 0 }
+.call-guide dl>div { padding: 8px 0 }
+.call-guide dt { font-size: .7rem }
+.call-guide dd { font-size: .74rem; font-weight: 700; text-align: right }
+.call-guide>strong { font-size: .78rem }
+.call-guide ol { display: grid; gap: 7px; margin: 0; padding-left: 20px; color: var(--bm-ink-soft); font-size: .75rem; line-height: 1.4 }
+.call-guide>small { color: var(--bm-muted); font-size: .67rem; line-height: 1.4 }
+.call-guide__copy { width: 100% }
+.call-guide .call-guide__status { margin: 0; color: var(--bm-accent); font-size: .72rem; font-weight: 700; text-align: center }
 .decision-dates dl { margin: 0 }
 .decision-dates dl>div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--bm-border) }
 .decision-dates dt { color: var(--bm-muted); font-size: .75rem }

@@ -54,4 +54,15 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/decisionDossier\.evidence/)
     expect(page).toMatch(/decisionDossier\.rule/)
   })
+
+  it('oferece um guião copiável com custo atual, prazo declarado e perguntas verificáveis', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/buildContractCallGuide/)
+    expect(page).toMatch(/Guião para falar com o fornecedor/i)
+    expect(page).toMatch(/Custo atual declarado/i)
+    expect(page).toMatch(/Copiar guião/i)
+    expect(page).toMatch(/navigator\.clipboard\.writeText/)
+    expect(page).toMatch(/callGuide\.rule/)
+  })
 })
