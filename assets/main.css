@@ -249,7 +249,16 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .lifecycle-empty { padding: 28px 24px }
 .lifecycle-empty p { max-width: 560px; margin: 7px 0 0; color: var(--bm-muted); line-height: 1.55 }
 .detail-sidebar { display: grid; align-content: start; gap: 18px }
-.decision-dates, .diagnosis { padding: 24px }
+.decision-dates, .diagnosis, .observed-value { padding: 24px }
+.observed-value h2 { margin: 5px 0 8px }
+.observed-value>p { margin: 0 0 14px; color: var(--bm-muted); font-size: .8rem; line-height: 1.5 }
+.observed-value .observed-value__rule { padding: 12px; color: var(--bm-ink-soft); background: var(--bm-surface-soft) }
+.observed-value__open { width: 100% }
+.observed-value__form { display: grid; gap: 9px; margin-top: 16px }
+.observed-value__form label { color: var(--bm-ink-soft); font-size: .78rem; font-weight: 700 }
+.observed-value__form>small { color: var(--bm-muted); font-size: .7rem; line-height: 1.45 }
+.observed-value__actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 5px }
+.observed-value .form-error, .observed-value .form-success { margin: 14px 0 0 }
 .decision-dates h2 { margin: 5px 0 8px }
 .decision-dates>p { margin: 0 0 18px; color: var(--bm-muted); font-size: .8rem; line-height: 1.5 }
 .decision-dates dl { margin: 0 }

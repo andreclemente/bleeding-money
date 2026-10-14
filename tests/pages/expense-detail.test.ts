@@ -14,4 +14,15 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Renovação, fidelização e fim de contrato são eventos diferentes/i)
     expect(page).not.toMatch(/poupança confirmada/i)
   })
+
+  it('permite registar um novo valor observado sem o apresentar como poupança confirmada', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Registar novo valor observado/i)
+    expect(page).toMatch(/method:\s*'PATCH'/)
+    expect(page).toMatch(/monthlyCostCents/)
+    expect(page).toMatch(/fica na linha de vida/i)
+    expect(page).toMatch(/não confirma uma poupança/i)
+    expect(page).toMatch(/Novo valor em EUR/i)
+  })
 })

@@ -3,7 +3,7 @@ import { buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
-const { data, pending, error } = await useFetch<{
+const { data, pending, error: loadError, refresh } = await useFetch<{
   expense: RecurringExpense
   snapshots: ExpenseSnapshot[]
   findings: SavingsFinding[]
@@ -40,6 +40,43 @@ const changeLabel = (change: { cents: number, basisPoints: number } | null) => {
   if (change.cents === 0) return 'Sem alteração face ao registo anterior'
   return `${change.cents > 0 ? 'Aumento' : 'Redução'} de ${money(Math.abs(change.cents))} (${percentage(change.basisPoints)}%)`
 }
+const valueEditorOpen = ref(false)
+const newMonthlyCost = ref('')
+const savingValue = ref(false)
+const valueError = ref('')
+const valueSuccess = ref('')
+const parseEuros = (value: string) => {
+  const normalized = value.trim().replace(',', '.')
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) throw new Error('Usa um valor em EUR com, no máximo, duas casas decimais.')
+  const [euros, decimals = ''] = normalized.split('.')
+  const cents = Number(euros) * 100 + Number(decimals.padEnd(2, '0'))
+  if (!Number.isSafeInteger(cents) || cents > 2_147_483_647) throw new Error('O valor indicado é demasiado elevado.')
+  return cents
+}
+const openValueEditor = () => {
+  newMonthlyCost.value = data.value ? String(data.value.expense.monthlyCostCents / 100).replace('.', ',') : ''
+  valueError.value = ''
+  valueSuccess.value = ''
+  valueEditorOpen.value = true
+}
+const saveObservedValue = async () => {
+  if (!data.value) return
+  valueError.value = ''
+  valueSuccess.value = ''
+  savingValue.value = true
+  try {
+    const monthlyCostCents = parseEuros(newMonthlyCost.value)
+    if (monthlyCostCents === data.value.expense.monthlyCostCents) throw new Error('Indica um valor diferente do custo atual.')
+    await $fetch(`/api/expenses/${data.value.expense.id}`, { method: 'PATCH', body: { monthlyCostCents } })
+    await refresh()
+    valueSuccess.value = 'Novo valor guardado na linha de vida.'
+    valueEditorOpen.value = false
+  } catch (caught) {
+    valueError.value = (caught as { data?: { statusMessage?: string }, message?: string }).data?.statusMessage || (caught as Error).message
+  } finally {
+    savingValue.value = false
+  }
+}
 </script>
 
 <template>
@@ -65,7 +102,7 @@ const changeLabel = (change: { cents: number, basisPoints: number } | null) => {
     </div>
 
     <div
-      v-else-if="error"
+      v-else-if="loadError"
       class="panel empty-state"
       role="alert"
     >
@@ -179,6 +216,79 @@ const changeLabel = (change: { cents: number, basisPoints: number } | null) => {
         </section>
 
         <div class="detail-sidebar">
+          <aside
+            class="panel observed-value"
+            aria-labelledby="observed-value-heading"
+          >
+            <div class="section-kicker">
+              Evidência manual
+            </div>
+            <h2 id="observed-value-heading">
+              Registar novo valor observado
+            </h2>
+            <p>Quando uma fatura ou extrato mostrar outro custo mensal, guarda-o aqui. O valor anterior fica na linha de vida.</p>
+            <p class="observed-value__rule">
+              Esta atualização regista um facto; não confirma uma poupança. Uma redução só entra no objetivo ao concluir um caso aberto com o novo custo real.
+            </p>
+            <button
+              v-if="!valueEditorOpen"
+              class="secondary-action observed-value__open"
+              type="button"
+              @click="openValueEditor"
+            >
+              Atualizar custo mensal
+            </button>
+            <form
+              v-else
+              class="observed-value__form"
+              @submit.prevent="saveObservedValue"
+            >
+              <label for="new-monthly-cost">Novo valor em EUR</label>
+              <div class="money-input">
+                <input
+                  id="new-monthly-cost"
+                  v-model="newMonthlyCost"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  :aria-invalid="Boolean(valueError)"
+                  aria-describedby="observed-value-help observed-value-error"
+                ><span>EUR</span>
+              </div>
+              <small id="observed-value-help">Usa o equivalente mensal que aparece na fatura ou no extrato.</small>
+              <div class="observed-value__actions">
+                <button
+                  type="button"
+                  class="text-action"
+                  @click="valueEditorOpen = false"
+                >
+                  Cancelar
+                </button>
+                <v-btn
+                  type="submit"
+                  color="primary"
+                  :loading="savingValue"
+                >
+                  Guardar valor
+                </v-btn>
+              </div>
+            </form>
+            <p
+              v-if="valueError"
+              id="observed-value-error"
+              class="form-error"
+              role="alert"
+            >
+              {{ valueError }}
+            </p>
+            <p
+              v-if="valueSuccess"
+              class="form-success"
+              role="status"
+            >
+              {{ valueSuccess }}
+            </p>
+          </aside>
+
           <aside
             class="panel decision-dates"
             aria-labelledby="decision-dates-heading"
