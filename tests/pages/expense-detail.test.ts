@@ -25,4 +25,15 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/não confirma uma poupança/i)
     expect(page).toMatch(/Novo valor em EUR/i)
   })
+
+  it('permite corrigir os prazos contratuais sem os confundir com custos ou poupanças', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Editar datas/i)
+    expect(page).toMatch(/Fim da fidelização/i)
+    expect(page).toMatch(/Fim do contrato/i)
+    expect(page).toMatch(/Próxima renovação/i)
+    expect(page).toMatch(/buildContractAgendaPatch/)
+    expect(page).toMatch(/factos declarados/i)
+  })
 })

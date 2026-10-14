@@ -266,6 +266,12 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .decision-dates dt { color: var(--bm-muted); font-size: .75rem }
 .decision-dates dd { margin: 0; font-size: .78rem; font-weight: 700; text-align: right }
 .missing-decision-date { padding: 12px; color: var(--bm-ink-soft); background: var(--bm-surface-soft); font-size: .78rem; line-height: 1.5 }
+.agenda-edit { width: 100%; margin-top: 16px }
+.agenda-form { display: grid; gap: 8px }
+.agenda-form label { margin-top: 5px; color: var(--bm-ink-soft); font-size: .75rem; font-weight: 700 }
+.agenda-form input { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--bm-border-strong); border-radius: 9px; color: var(--bm-ink); background: var(--bm-surface); font: inherit }
+.agenda-form>small { margin: 4px 0; color: var(--bm-muted); font-size: .7rem; line-height: 1.45 }
+.decision-dates .form-error, .decision-dates .form-success { margin: 14px 0 0 }
 .health-indicator { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; font-weight: 600 }
 .health-indicator .status-dot { width: 11px; height: 11px }
 .health-indicator--attention { color: var(--bm-warning) }

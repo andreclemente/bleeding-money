@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { buildContractAgendaPatch } from '../../domain/contract-agenda'
 import { buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
@@ -75,6 +76,43 @@ const saveObservedValue = async () => {
     valueError.value = (caught as { data?: { statusMessage?: string }, message?: string }).data?.statusMessage || (caught as Error).message
   } finally {
     savingValue.value = false
+  }
+}
+const agendaEditorOpen = ref(false)
+const commitmentEndDate = ref('')
+const contractEndDate = ref('')
+const renewalDate = ref('')
+const savingAgenda = ref(false)
+const agendaError = ref('')
+const agendaSuccess = ref('')
+const openAgendaEditor = () => {
+  if (!data.value) return
+  commitmentEndDate.value = data.value.expense.commitmentEndDate || ''
+  contractEndDate.value = data.value.expense.contractEndDate || ''
+  renewalDate.value = data.value.expense.details.kind === 'insurance' ? data.value.expense.details.renewalDate || '' : ''
+  agendaError.value = ''
+  agendaSuccess.value = ''
+  agendaEditorOpen.value = true
+}
+const saveAgenda = async () => {
+  if (!data.value) return
+  agendaError.value = ''
+  agendaSuccess.value = ''
+  savingAgenda.value = true
+  try {
+    const body = buildContractAgendaPatch(data.value.expense, {
+      commitmentEndDate: commitmentEndDate.value,
+      contractEndDate: contractEndDate.value,
+      renewalDate: insuranceDetails.value ? renewalDate.value : undefined
+    })
+    await $fetch(`/api/expenses/${data.value.expense.id}`, { method: 'PATCH', body })
+    await refresh()
+    agendaSuccess.value = 'Datas guardadas como factos declarados.'
+    agendaEditorOpen.value = false
+  } catch (caught) {
+    agendaError.value = (caught as { data?: { statusMessage?: string }, message?: string }).data?.statusMessage || (caught as Error).message
+  } finally {
+    savingAgenda.value = false
   }
 }
 </script>
@@ -299,22 +337,88 @@ const saveObservedValue = async () => {
             <h2 id="decision-dates-heading">
               Datas para decidir
             </h2>
-            <p>Renovação, fidelização e fim de contrato são eventos diferentes.</p>
-            <dl v-if="lifecycle!.decisionDates.length">
+            <p>Renovação, fidelização e fim de contrato são eventos diferentes. São factos declarados; não alteram custos nem confirmam poupanças.</p>
+            <template v-if="!agendaEditorOpen">
+              <dl v-if="lifecycle!.decisionDates.length">
+                <div
+                  v-for="event in lifecycle!.decisionDates"
+                  :key="`${event.kind}-${event.date}`"
+                >
+                  <dt>{{ event.label }}</dt>
+                  <dd>{{ date(event.date) }}</dd>
+                </div>
+              </dl>
               <div
-                v-for="event in lifecycle!.decisionDates"
-                :key="`${event.kind}-${event.date}`"
+                v-else
+                class="missing-decision-date"
               >
-                <dt>{{ event.label }}</dt>
-                <dd>{{ date(event.date) }}</dd>
+                Sem prazo declarado. Não assumimos uma data.
               </div>
-            </dl>
-            <div
+              <button
+                class="secondary-action agenda-edit"
+                type="button"
+                @click="openAgendaEditor"
+              >
+                Editar datas
+              </button>
+            </template>
+            <form
               v-else
-              class="missing-decision-date"
+              class="agenda-form"
+              @submit.prevent="saveAgenda"
             >
-              Sem prazo declarado. Não assumimos uma data.
-            </div>
+              <label for="commitment-end-date">Fim da fidelização</label>
+              <input
+                id="commitment-end-date"
+                v-model="commitmentEndDate"
+                type="date"
+              >
+              <label for="contract-end-date">Fim do contrato</label>
+              <input
+                id="contract-end-date"
+                v-model="contractEndDate"
+                type="date"
+              >
+              <template v-if="insuranceDetails">
+                <label for="renewal-date">Próxima renovação</label>
+                <input
+                  id="renewal-date"
+                  v-model="renewalDate"
+                  type="date"
+                >
+              </template>
+              <small>Deixa um campo vazio para manter o valor atual. As datas ficam no histórico como uma atualização manual.</small>
+              <div class="observed-value__actions">
+                <button
+                  type="button"
+                  class="text-action"
+                  @click="agendaEditorOpen = false"
+                >
+                  Cancelar
+                </button>
+                <v-btn
+                  type="submit"
+                  color="primary"
+                  :loading="savingAgenda"
+                >
+                  Guardar datas
+                </v-btn>
+              </div>
+            </form>
+            <p
+              v-if="agendaError"
+              class="form-error"
+              role="alert"
+            >
+              {{ agendaError }}
+            </p>
+            <p
+              v-if="agendaSuccess"
+              class="form-success"
+              role="status"
+            >
+              {{ agendaSuccess }}
+            </p>
           </aside>
 
           <aside
