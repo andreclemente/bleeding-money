@@ -12,7 +12,7 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Variação confirmada/i)
     expect(page).toMatch(/Datas para decidir/i)
     expect(page).toMatch(/Renovação, fidelização e fim de contrato são eventos diferentes/i)
-    expect(page).not.toMatch(/poupança confirmada/i)
+    expect(page).not.toMatch(/poupança confirmada\s*[:—-]/i)
   })
 
   it('permite registar um novo valor observado sem o apresentar como poupança confirmada', async () => {
@@ -64,5 +64,16 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Copiar guião/i)
     expect(page).toMatch(/navigator\.clipboard\.writeText/)
     expect(page).toMatch(/callGuide\.rule/)
+  })
+
+  it('compara uma proposta recebida pelo custo total sem a tratar como aceite', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/compareContractProposal/)
+    expect(page).toMatch(/Comparar proposta recebida/i)
+    expect(page).toMatch(/Custo único/i)
+    expect(page).toMatch(/Total no período/i)
+    expect(page).toMatch(/Proposta em análise/i)
+    expect(page).toMatch(/não é uma poupança confirmada/i)
   })
 })

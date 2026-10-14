@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -141,5 +141,31 @@ describe('linha de vida da despesa', () => {
       ],
       rule: 'Regista a resposta como proposta. Só um novo custo aceite e observado confirma poupança.'
     })
+  })
+
+  it('compara o custo total de uma proposta com o contrato atual sem confirmar poupança', () => {
+    expect(compareContractProposal({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 3990,
+      oneOffCents: 5000,
+      commitmentMonths: 24
+    })).toEqual({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 3990,
+      oneOffCents: 5000,
+      commitmentMonths: 24,
+      currentPeriodCents: 117_360,
+      proposedPeriodCents: 100_760,
+      proposedMonthlyEquivalentCents: 4198,
+      periodDifferenceCents: 16_600,
+      outcome: 'lower',
+      rule: 'Comparação condicional: assume o custo atual constante durante o período; não confirma poupança.'
+    })
+  })
+
+  it('assinala propostas mais caras e rejeita valores monetários inseguros', () => {
+    expect(compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 2100, oneOffCents: 0, commitmentMonths: 12 }).outcome).toBe('higher')
+    expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: Number.MAX_SAFE_INTEGER, oneOffCents: 0, commitmentMonths: 12 })).toThrow(/Valor monetário inválido/)
+    expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 0 })).toThrow(/Duração inválida/)
   })
 })

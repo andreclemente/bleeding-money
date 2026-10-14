@@ -39,6 +39,19 @@ export type ContractCallGuide = {
   rule: string
 }
 
+export type ContractProposalComparison = {
+  currentMonthlyCents: number
+  proposedMonthlyCents: number
+  oneOffCents: number
+  commitmentMonths: number
+  currentPeriodCents: number
+  proposedPeriodCents: number
+  proposedMonthlyEquivalentCents: number
+  periodDifferenceCents: number
+  outcome: 'lower' | 'same' | 'higher'
+  rule: string
+}
+
 const civilDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 const dayMs = 86_400_000
 
@@ -127,6 +140,33 @@ export const buildContractCallGuide = (expense: RecurringExpense, decisionDates:
   questions: structuredClone(callQuestions[expense.category]),
   rule: 'Regista a resposta como proposta. Só um novo custo aceite e observado confirma poupança.'
 })
+
+export const compareContractProposal = (input: {
+  currentMonthlyCents: number
+  proposedMonthlyCents: number
+  oneOffCents: number
+  commitmentMonths: number
+}): ContractProposalComparison => {
+  for (const value of [input.currentMonthlyCents, input.proposedMonthlyCents, input.oneOffCents]) {
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error('Valor monetário inválido.')
+  }
+  if (!Number.isSafeInteger(input.commitmentMonths) || input.commitmentMonths < 1 || input.commitmentMonths > 120) throw new Error('Duração inválida.')
+
+  const currentPeriodCents = input.currentMonthlyCents * input.commitmentMonths
+  const proposedPeriodCents = input.proposedMonthlyCents * input.commitmentMonths + input.oneOffCents
+  if (!Number.isSafeInteger(currentPeriodCents) || !Number.isSafeInteger(proposedPeriodCents)) throw new Error('Valor monetário inválido.')
+  const periodDifferenceCents = currentPeriodCents - proposedPeriodCents
+
+  return {
+    ...input,
+    currentPeriodCents,
+    proposedPeriodCents,
+    proposedMonthlyEquivalentCents: Math.round(proposedPeriodCents / input.commitmentMonths),
+    periodDifferenceCents,
+    outcome: periodDifferenceCents > 0 ? 'lower' : periodDifferenceCents < 0 ? 'higher' : 'same',
+    rule: 'Comparação condicional: assume o custo atual constante durante o período; não confirma poupança.'
+  }
+}
 
 export const buildContractDecisionSignal = (events: ExpenseDecisionDate[], civilDate: string): ContractDecisionSignal | null => {
   const today = civilDay(civilDate)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -81,6 +81,34 @@ const parseEuros = (value: string) => {
   if (!Number.isSafeInteger(cents) || cents > 2_147_483_647) throw new Error('O valor indicado é demasiado elevado.')
   return cents
 }
+const proposalMonthlyCost = ref('')
+const proposalOneOffCost = ref('0')
+const proposalCommitmentMonths = ref('12')
+const proposalError = ref('')
+const proposalComparison = ref<ReturnType<typeof compareContractProposal> | null>(null)
+const compareProposal = () => {
+  if (!data.value) return
+  proposalError.value = ''
+  proposalComparison.value = null
+  try {
+    if (!/^\d+$/.test(proposalCommitmentMonths.value.trim())) throw new Error('Indica a duração em meses inteiros.')
+    proposalComparison.value = compareContractProposal({
+      currentMonthlyCents: data.value.expense.monthlyCostCents,
+      proposedMonthlyCents: parseEuros(proposalMonthlyCost.value),
+      oneOffCents: parseEuros(proposalOneOffCost.value),
+      commitmentMonths: Number(proposalCommitmentMonths.value)
+    })
+  } catch (caught) {
+    proposalError.value = (caught as Error).message
+  }
+}
+const proposalOutcome = computed(() => {
+  const comparison = proposalComparison.value
+  if (!comparison) return ''
+  if (comparison.outcome === 'lower') return `A proposta custa menos ${money(comparison.periodDifferenceCents)} no período indicado.`
+  if (comparison.outcome === 'higher') return `A proposta custa mais ${money(Math.abs(comparison.periodDifferenceCents))} no período indicado.`
+  return 'A proposta tem o mesmo custo total no período indicado.'
+})
 const openValueEditor = () => {
   newMonthlyCost.value = data.value ? String(data.value.expense.monthlyCostCents / 100).replace('.', ',') : ''
   valueError.value = ''
@@ -428,6 +456,70 @@ const saveAgenda = async () => {
                   {{ callGuideStatus }}
                 </p>
               </div>
+              <form
+                class="proposal-comparison"
+                @submit.prevent="compareProposal"
+              >
+                <span>Comparar proposta recebida</span>
+                <p>Compara a proposta declarada com o cenário em que o custo atual não muda. A proposta fica em análise: não é aceite, não altera o contrato e não é uma poupança confirmada.</p>
+                <label for="proposal-monthly-cost">Mensalidade proposta</label>
+                <div class="money-input">
+                  <input
+                    id="proposal-monthly-cost"
+                    v-model="proposalMonthlyCost"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    placeholder="0,00"
+                    :aria-invalid="Boolean(proposalError)"
+                  ><span>EUR</span>
+                </div>
+                <label for="proposal-one-off-cost">Custo único</label>
+                <div class="money-input">
+                  <input
+                    id="proposal-one-off-cost"
+                    v-model="proposalOneOffCost"
+                    inputmode="decimal"
+                    autocomplete="off"
+                  ><span>EUR</span>
+                </div>
+                <label for="proposal-commitment-months">Período comparado</label>
+                <div class="proposal-comparison__months">
+                  <input
+                    id="proposal-commitment-months"
+                    v-model="proposalCommitmentMonths"
+                    inputmode="numeric"
+                    autocomplete="off"
+                  ><span>meses</span>
+                </div>
+                <button
+                  class="secondary-action"
+                  type="submit"
+                >
+                  Comparar custo total
+                </button>
+                <p
+                  v-if="proposalError"
+                  class="form-error"
+                  role="alert"
+                >
+                  {{ proposalError }}
+                </p>
+                <div
+                  v-if="proposalComparison"
+                  class="proposal-comparison__result"
+                  :class="`proposal-comparison__result--${proposalComparison.outcome}`"
+                  role="status"
+                >
+                  <strong>Proposta em análise</strong>
+                  <dl>
+                    <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
+                    <div><dt>Total no período</dt><dd>{{ money(proposalComparison.proposedPeriodCents) }}</dd></div>
+                    <div><dt>Equivalente mensal da proposta</dt><dd>{{ money(proposalComparison.proposedMonthlyEquivalentCents) }}</dd></div>
+                  </dl>
+                  <b>{{ proposalOutcome }}</b>
+                  <small>{{ proposalComparison.rule }}</small>
+                </div>
+              </form>
               <dl v-if="lifecycle!.decisionDates.length">
                 <div
                   v-for="event in lifecycle!.decisionDates"
