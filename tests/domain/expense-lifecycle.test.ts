@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import { buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -67,5 +67,37 @@ describe('linha de vida da despesa', () => {
     expect(lifecycle.observations).toEqual([])
     expect(lifecycle.decisionDates).toEqual([])
     expect(lifecycle.annualEquivalentCents).toBe(14_388)
+  })
+
+  it('destaca o próximo prazo declarado com uma ação verificável', () => {
+    const signal = buildContractDecisionSignal([
+      { kind: 'commitment', label: 'Fim da fidelização', date: '2026-10-01' },
+      { kind: 'renewal', label: 'Próxima renovação', date: '2026-10-20' },
+      { kind: 'contract', label: 'Fim do contrato', date: '2027-01-31' }
+    ], '2026-10-14')
+
+    expect(signal).toEqual({
+      event: { kind: 'renewal', label: 'Próxima renovação', date: '2026-10-20' },
+      timing: 'soon',
+      days: 6,
+      timingLabel: 'Daqui a 6 dias',
+      action: 'Confirma as condições de renovação junto do fornecedor.'
+    })
+  })
+
+  it('assinala o último prazo passado sem inventar uma nova data', () => {
+    const signal = buildContractDecisionSignal([
+      { kind: 'commitment', label: 'Fim da fidelização', date: '2026-09-01' },
+      { kind: 'contract', label: 'Fim do contrato', date: '2026-10-10' }
+    ], '2026-10-14')
+
+    expect(signal).toEqual({
+      event: { kind: 'contract', label: 'Fim do contrato', date: '2026-10-10' },
+      timing: 'passed',
+      days: 4,
+      timingLabel: 'Passou há 4 dias',
+      action: 'Confirma o estado atual do contrato e corrige a data se renovou.'
+    })
+    expect(buildContractDecisionSignal([], '2026-10-14')).toBeNull()
   })
 })

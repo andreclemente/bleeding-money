@@ -261,6 +261,13 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .observed-value .form-error, .observed-value .form-success { margin: 14px 0 0 }
 .decision-dates h2 { margin: 5px 0 8px }
 .decision-dates>p { margin: 0 0 18px; color: var(--bm-muted); font-size: .8rem; line-height: 1.5 }
+.decision-signal { display: grid; gap: 5px; margin-bottom: 16px; padding: 14px; border: 1px solid var(--bm-border-strong); border-radius: 10px; background: var(--bm-surface-soft) }
+.decision-signal>span { color: var(--bm-muted); font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase }
+.decision-signal>strong { font-size: .9rem }
+.decision-signal>b { color: var(--bm-accent); font-size: .78rem }
+.decision-signal>p { margin: 4px 0 0; color: var(--bm-ink-soft); font-size: .78rem; line-height: 1.45 }
+.decision-signal>small { color: var(--bm-muted); font-size: .67rem }
+.decision-signal--soon, .decision-signal--today, .decision-signal--passed { border-color: var(--bm-warning); background: var(--bm-warning-soft) }
 .decision-dates dl { margin: 0 }
 .decision-dates dl>div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--bm-border) }
 .decision-dates dt { color: var(--bm-muted); font-size: .75rem }

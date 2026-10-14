@@ -17,6 +17,52 @@ export type ExpenseLifecycle = {
   decisionDates: ExpenseDecisionDate[]
 }
 
+export type ContractDecisionSignal = {
+  event: ExpenseDecisionDate
+  timing: 'today' | 'soon' | 'upcoming' | 'passed'
+  days: number
+  timingLabel: string
+  action: string
+}
+
+const civilDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
+const dayMs = 86_400_000
+
+const actionFor = (event: ExpenseDecisionDate) => {
+  if (event.kind === 'renewal') return 'Confirma as condições de renovação junto do fornecedor.'
+  if (event.kind === 'commitment') return 'Confirma se já podes renegociar ou mudar de fornecedor.'
+  return 'Confirma as condições de termo ou continuação do contrato.'
+}
+
+export const buildContractDecisionSignal = (events: ExpenseDecisionDate[], civilDate: string): ContractDecisionSignal | null => {
+  const today = civilDay(civilDate)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(civilDate) || Number.isNaN(today) || new Date(today).toISOString().slice(0, 10) !== civilDate) throw new Error('Data civil inválida.')
+  if (!events.length) return null
+
+  const ordered = [...events].sort((left, right) => left.date.localeCompare(right.date))
+  const next = ordered.find(event => civilDay(event.date) >= today)
+  if (next) {
+    const days = (civilDay(next.date) - today) / dayMs
+    return {
+      event: structuredClone(next),
+      timing: days === 0 ? 'today' : days <= 30 ? 'soon' : 'upcoming',
+      days,
+      timingLabel: days === 0 ? 'É hoje' : days === 1 ? 'É amanhã' : `Daqui a ${days} dias`,
+      action: actionFor(next)
+    }
+  }
+
+  const event = ordered.at(-1)!
+  const days = (today - civilDay(event.date)) / dayMs
+  return {
+    event: structuredClone(event),
+    timing: 'passed',
+    days,
+    timingLabel: days === 1 ? 'Passou ontem' : `Passou há ${days} dias`,
+    action: 'Confirma o estado atual do contrato e corrige a data se renovou.'
+  }
+}
+
 export const buildExpenseLifecycle = (expense: RecurringExpense, snapshots: ExpenseSnapshot[]): ExpenseLifecycle => {
   const orderedSnapshots = snapshots
     .map(snapshot => structuredClone(snapshot))

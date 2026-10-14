@@ -36,4 +36,13 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/buildContractAgendaPatch/)
     expect(page).toMatch(/factos declarados/i)
   })
+
+  it('transforma a agenda declarada num próximo passo concreto sem estimar poupanças', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Próximo prazo declarado/i)
+    expect(page).toMatch(/buildContractDecisionSignal/)
+    expect(page).toMatch(/decisionSignal\.action/)
+    expect(page).toMatch(/Não altera custos nem confirma poupanças/i)
+  })
 })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
-import { buildExpenseLifecycle } from '../../domain/expense-lifecycle'
+import { buildContractDecisionSignal, buildExpenseLifecycle } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -35,6 +35,9 @@ const coverageLabels: Record<InsuranceCoverageCode, string> = { civil_liability:
 const policyLabel = (details: InsuranceDetails) => policyTypes[details.policyType]
 const coverageText = (details: InsuranceDetails) => details.coverageCodes.length ? details.coverageCodes.map(code => coverageLabels[code]).join(', ') : 'Não declaradas'
 const lifecycle = computed(() => data.value ? buildExpenseLifecycle(data.value.expense, data.value.snapshots) : null)
+const today = new Date()
+const currentCivilDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+const decisionSignal = computed(() => lifecycle.value ? buildContractDecisionSignal(lifecycle.value.decisionDates, currentCivilDate) : null)
 const percentage = (basisPoints: number) => new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.abs(basisPoints) / 100)
 const changeLabel = (change: { cents: number, basisPoints: number } | null) => {
   if (!change) return 'Primeiro valor registado'
@@ -339,6 +342,17 @@ const saveAgenda = async () => {
             </h2>
             <p>Renovação, fidelização e fim de contrato são eventos diferentes. São factos declarados; não alteram custos nem confirmam poupanças.</p>
             <template v-if="!agendaEditorOpen">
+              <div
+                v-if="decisionSignal"
+                class="decision-signal"
+                :class="`decision-signal--${decisionSignal.timing}`"
+              >
+                <span>Próximo prazo declarado</span>
+                <strong>{{ decisionSignal.event.label }} · {{ date(decisionSignal.event.date) }}</strong>
+                <b>{{ decisionSignal.timingLabel }}</b>
+                <p>{{ decisionSignal.action }}</p>
+                <small>Não altera custos nem confirma poupanças.</small>
+              </div>
               <dl v-if="lifecycle!.decisionDates.length">
                 <div
                   v-for="event in lifecycle!.decisionDates"
