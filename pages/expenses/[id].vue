@@ -124,6 +124,19 @@ const proposalBreakEven = computed(() => {
   if (comparison.breakEvenMonth === 0) return 'Sem custos únicos por recuperar; a diferença mensal começa no 1.º mês.'
   return `Custos únicos recuperados no ${comparison.breakEvenMonth}.º mês, se os valores não mudarem.`
 })
+const proposalLaterPriceSignal = computed(() => {
+  const difference = proposalComparison.value?.laterRecurringDifferenceCents
+  if (difference === undefined) return null
+  if (difference < 0) return {
+    tone: 'warning',
+    text: `Depois da promoção, a mensalidade fica ${money(Math.abs(difference))} acima do custo atual declarado. A vantagem acumulada começa a diminuir.`
+  }
+  if (difference > 0) return {
+    tone: 'positive',
+    text: `Depois da promoção, a mensalidade continua ${money(difference)} abaixo do custo atual declarado.`
+  }
+  return { tone: 'neutral', text: 'Depois da promoção, a mensalidade fica igual ao custo atual declarado.' }
+})
 const openValueEditor = () => {
   newMonthlyCost.value = data.value ? String(data.value.expense.monthlyCostCents / 100).replace('.', ',') : ''
   valueError.value = ''
@@ -568,6 +581,13 @@ const saveAgenda = async () => {
                       <dt>Diferença recorrente mensal</dt><dd>{{ money(proposalComparison.recurringDifferenceCents) }}</dd>
                     </div>
                   </dl>
+                  <p
+                    v-if="proposalLaterPriceSignal"
+                    class="proposal-comparison__later-signal"
+                    :class="`proposal-comparison__later-signal--${proposalLaterPriceSignal.tone}`"
+                  >
+                    {{ proposalLaterPriceSignal.text }}
+                  </p>
                   <b>{{ proposalOutcome }}</b>
                   <p><strong>Ponto de equilíbrio</strong> · {{ proposalBreakEven }}</p>
                   <small>{{ proposalComparison.rule }}</small>

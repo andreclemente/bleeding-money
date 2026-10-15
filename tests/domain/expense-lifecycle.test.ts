@@ -179,7 +179,22 @@ describe('linha de vida da despesa', () => {
       laterPeriodMonths: 18,
       proposedPeriodCents: 103_560,
       proposedMonthlyEquivalentCents: 4315,
+      laterRecurringDifferenceCents: 300,
       periodDifferenceCents: 13_800,
+      outcome: 'lower'
+    })
+  })
+
+  it('expõe quando o preço posterior à promoção fica acima do contrato atual', () => {
+    expect(compareContractProposal({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 2990,
+      oneOffCents: 0,
+      commitmentMonths: 24,
+      introductoryMonths: 6,
+      laterMonthlyCents: 5290
+    })).toMatchObject({
+      laterRecurringDifferenceCents: -400,
       outcome: 'lower'
     })
   })
