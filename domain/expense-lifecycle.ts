@@ -14,6 +14,13 @@ export type ExpenseLifecycleObservation = {
 export type ExpenseLifecycle = {
   annualEquivalentCents: number
   observations: ExpenseLifecycleObservation[]
+  observedChange: {
+    monthlyCents: number
+    annualCents: number
+    basisPoints: number
+    fromDate: string
+    toDate: string
+  } | null
   decisionDates: ExpenseDecisionDate[]
 }
 
@@ -300,6 +307,18 @@ export const buildExpenseLifecycle = (expense: RecurringExpense, snapshots: Expe
     }
   })
 
+  const firstSnapshot = orderedSnapshots[0]
+  const latestSnapshot = orderedSnapshots.at(-1)
+  const observedChange = firstSnapshot && latestSnapshot && firstSnapshot.id !== latestSnapshot.id
+    ? {
+        monthlyCents: latestSnapshot.priceCents - firstSnapshot.priceCents,
+        annualCents: (latestSnapshot.priceCents - firstSnapshot.priceCents) * 12,
+        basisPoints: firstSnapshot.priceCents === 0 ? 0 : Math.round(((latestSnapshot.priceCents - firstSnapshot.priceCents) * 10_000) / firstSnapshot.priceCents),
+        fromDate: firstSnapshot.observedAt,
+        toDate: latestSnapshot.observedAt
+      }
+    : null
+
   const decisionDates: ExpenseDecisionDate[] = []
   if (expense.commitmentEndDate) decisionDates.push({ kind: 'commitment', label: 'Fim da fidelização', date: expense.commitmentEndDate })
   if (expense.details.kind === 'insurance' && expense.details.renewalDate) decisionDates.push({ kind: 'renewal', label: 'Próxima renovação', date: expense.details.renewalDate })
@@ -309,6 +328,7 @@ export const buildExpenseLifecycle = (expense: RecurringExpense, snapshots: Expe
   return {
     annualEquivalentCents: expense.monthlyCostCents * 12,
     observations,
+    observedChange,
     decisionDates
   }
 }

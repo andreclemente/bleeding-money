@@ -68,6 +68,14 @@ const changeLabel = (change: { cents: number, basisPoints: number } | null) => {
   if (change.cents === 0) return 'Sem alteração face ao registo anterior'
   return `${change.cents > 0 ? 'Aumento' : 'Redução'} de ${money(Math.abs(change.cents))} (${percentage(change.basisPoints)}%)`
 }
+const observedChangeLabel = (change: NonNullable<ReturnType<typeof buildExpenseLifecycle>['observedChange']>) => {
+  if (change.monthlyCents === 0) return 'Sem alteração entre o primeiro e o último valor'
+  return `${change.monthlyCents > 0 ? 'Aumento' : 'Redução'} de ${money(Math.abs(change.monthlyCents))} / mês (${percentage(change.basisPoints)}%)`
+}
+const observedAnnualImpactLabel = (annualCents: number) => {
+  if (annualCents === 0) return 'sem alteração anual'
+  return `${money(Math.abs(annualCents))} ${annualCents > 0 ? 'mais' : 'menos'} por ano`
+}
 const valueEditorOpen = ref(false)
 const newMonthlyCost = ref('')
 const savingValue = ref(false)
@@ -353,6 +361,18 @@ const saveAgenda = async () => {
               </h2>
             </div>
             <span class="evidence-rule">Variação confirmada apenas entre valores observados</span>
+          </div>
+          <div
+            v-if="lifecycle!.observedChange"
+            class="observed-change-summary"
+            :class="{ 'observed-change-summary--increase': lifecycle!.observedChange.monthlyCents > 0, 'observed-change-summary--reduction': lifecycle!.observedChange.monthlyCents < 0 }"
+          >
+            <span>Evolução entre valores observados</span>
+            <strong>{{ observedChangeLabel(lifecycle!.observedChange) }}</strong>
+            <p>
+              De {{ date(lifecycle!.observedChange.fromDate) }} a {{ date(lifecycle!.observedChange.toDate) }} · impacto anual ao ritmo atual: {{ observedAnnualImpactLabel(lifecycle!.observedChange.annualCents) }}.
+            </p>
+            <small>Resume apenas valores registados; não é uma previsão nem uma poupança confirmada.</small>
           </div>
           <ol
             v-if="lifecycle!.observations.length"

@@ -44,6 +44,13 @@ describe('linha de vida da despesa', () => {
       { cents: 500, basisPoints: 1355 },
       { cents: 700, basisPoints: 1671 }
     ])
+    expect(lifecycle.observedChange).toEqual({
+      monthlyCents: 1200,
+      annualCents: 14_400,
+      basisPoints: 3252,
+      fromDate: '2024-01-01',
+      toDate: '2026-08-01'
+    })
   })
 
   it('separa renovação, fim de fidelização e fim de contrato sem inventar datas', () => {
@@ -65,8 +72,24 @@ describe('linha de vida da despesa', () => {
     const lifecycle = buildExpenseLifecycle(expense({ monthlyCostCents: 1199, contractStartDate: undefined, commitmentEndDate: undefined }), [])
 
     expect(lifecycle.observations).toEqual([])
+    expect(lifecycle.observedChange).toBeNull()
     expect(lifecycle.decisionDates).toEqual([])
     expect(lifecycle.annualEquivalentCents).toBe(14_388)
+  })
+
+  it('resume uma redução apenas entre o primeiro e o último valor observados', () => {
+    const lifecycle = buildExpenseLifecycle(expense(), [
+      snapshot('first', '2025-01-01', 5000),
+      snapshot('latest', '2026-01-01', 4500)
+    ])
+
+    expect(lifecycle.observedChange).toEqual({
+      monthlyCents: -500,
+      annualCents: -6000,
+      basisPoints: -1000,
+      fromDate: '2025-01-01',
+      toDate: '2026-01-01'
+    })
   })
 
   it('destaca o próximo prazo declarado com uma ação verificável', () => {
