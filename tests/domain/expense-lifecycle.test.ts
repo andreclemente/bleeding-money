@@ -178,6 +178,8 @@ describe('linha de vida da despesa', () => {
       introductoryMonths: 6,
       laterMonthlyCents: 4590,
       laterPeriodMonths: 18,
+      laterAnnualCents: 55_080,
+      laterAnnualDifferenceCents: 3_600,
       proposedPeriodCents: 103_560,
       proposedMonthlyEquivalentCents: 4315,
       laterRecurringDifferenceCents: 300,
@@ -197,6 +199,8 @@ describe('linha de vida da despesa', () => {
       laterMonthlyCents: 5290
     })).toMatchObject({
       laterRecurringDifferenceCents: -400,
+      laterAnnualCents: 63_480,
+      laterAnnualDifferenceCents: -4_800,
       maximumMonthlyCentsForNoIncrease: 5523,
       outcome: 'lower'
     })

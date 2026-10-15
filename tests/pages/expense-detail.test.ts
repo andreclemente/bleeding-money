@@ -77,6 +77,8 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Mensalidade posterior/i)
     expect(page).toMatch(/Preço inicial/i)
     expect(page).toMatch(/Preço posterior/i)
+    expect(page).toMatch(/Custo anual depois da promoção/i)
+    expect(page).toMatch(/por ano face ao custo atual declarado/i)
     expect(page).toMatch(/Depois da promoção/i)
     expect(page).toMatch(/acima do custo atual declarado/i)
     expect(page).toMatch(/vantagem acumulada começa a diminuir/i)
