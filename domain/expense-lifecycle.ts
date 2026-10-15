@@ -49,6 +49,9 @@ export type ContractProposalComparison = {
   proposedMonthlyEquivalentCents: number
   recurringDifferenceCents: number
   breakEvenMonth: number | null
+  introductoryMonths?: number
+  laterMonthlyCents?: number
+  laterPeriodMonths?: number
   periodDifferenceCents: number
   outcome: 'lower' | 'same' | 'higher'
   rule: string
@@ -148,26 +151,46 @@ export const compareContractProposal = (input: {
   proposedMonthlyCents: number
   oneOffCents: number
   commitmentMonths: number
+  introductoryMonths?: number
+  laterMonthlyCents?: number
 }): ContractProposalComparison => {
-  for (const value of [input.currentMonthlyCents, input.proposedMonthlyCents, input.oneOffCents]) {
+  for (const value of [input.currentMonthlyCents, input.proposedMonthlyCents, input.oneOffCents, input.laterMonthlyCents].filter(value => value !== undefined)) {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('Valor monetário inválido.')
   }
   if (!Number.isSafeInteger(input.commitmentMonths) || input.commitmentMonths < 1 || input.commitmentMonths > 120) throw new Error('Duração inválida.')
 
+  const hasPhasedPrice = input.introductoryMonths !== undefined || input.laterMonthlyCents !== undefined
+  if (hasPhasedPrice && input.laterMonthlyCents === undefined) throw new Error('Indica o preço posterior à promoção.')
+  if (hasPhasedPrice && (!Number.isSafeInteger(input.introductoryMonths) || input.introductoryMonths! < 1 || input.introductoryMonths! >= input.commitmentMonths)) {
+    throw new Error('Duração promocional inválida.')
+  }
+
   const currentPeriodCents = input.currentMonthlyCents * input.commitmentMonths
-  const proposedPeriodCents = input.proposedMonthlyCents * input.commitmentMonths + input.oneOffCents
+  const laterPeriodMonths = hasPhasedPrice ? input.commitmentMonths - input.introductoryMonths! : 0
+  const proposedRecurringPeriodCents = hasPhasedPrice
+    ? input.proposedMonthlyCents * input.introductoryMonths! + input.laterMonthlyCents! * laterPeriodMonths
+    : input.proposedMonthlyCents * input.commitmentMonths
+  const proposedPeriodCents = proposedRecurringPeriodCents + input.oneOffCents
   if (!Number.isSafeInteger(currentPeriodCents) || !Number.isSafeInteger(proposedPeriodCents)) throw new Error('Valor monetário inválido.')
   const recurringDifferenceCents = input.currentMonthlyCents - input.proposedMonthlyCents
   if (!Number.isSafeInteger(recurringDifferenceCents)) throw new Error('Valor monetário inválido.')
   const periodDifferenceCents = currentPeriodCents - proposedPeriodCents
+  let breakEvenMonth: number | null = input.oneOffCents === 0 && input.proposedMonthlyCents < input.currentMonthlyCents ? 0 : null
+  let accumulatedDifferenceCents = -input.oneOffCents
+  for (let month = 1; breakEvenMonth === null && month <= input.commitmentMonths; month += 1) {
+    const proposedMonthlyCents = hasPhasedPrice && month > input.introductoryMonths! ? input.laterMonthlyCents! : input.proposedMonthlyCents
+    accumulatedDifferenceCents += input.currentMonthlyCents - proposedMonthlyCents
+    if (accumulatedDifferenceCents >= 0) breakEvenMonth = month
+  }
 
   return {
     ...input,
+    ...(hasPhasedPrice ? { laterPeriodMonths } : {}),
     currentPeriodCents,
     proposedPeriodCents,
     proposedMonthlyEquivalentCents: Math.round(proposedPeriodCents / input.commitmentMonths),
     recurringDifferenceCents,
-    breakEvenMonth: recurringDifferenceCents > 0 ? Math.ceil(input.oneOffCents / recurringDifferenceCents) : null,
+    breakEvenMonth,
     periodDifferenceCents,
     outcome: periodDifferenceCents > 0 ? 'lower' : periodDifferenceCents < 0 ? 'higher' : 'same',
     rule: 'Comparação condicional: assume o custo atual constante durante o período; não confirma poupança.'

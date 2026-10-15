@@ -84,6 +84,9 @@ const parseEuros = (value: string) => {
 const proposalMonthlyCost = ref('')
 const proposalOneOffCost = ref('0')
 const proposalCommitmentMonths = ref('12')
+const proposalHasLaterPrice = ref(false)
+const proposalIntroductoryMonths = ref('')
+const proposalLaterMonthlyCost = ref('')
 const proposalError = ref('')
 const proposalComparison = ref<ReturnType<typeof compareContractProposal> | null>(null)
 const compareProposal = () => {
@@ -92,11 +95,16 @@ const compareProposal = () => {
   proposalComparison.value = null
   try {
     if (!/^\d+$/.test(proposalCommitmentMonths.value.trim())) throw new Error('Indica a duração em meses inteiros.')
+    if (proposalHasLaterPrice.value && !/^\d+$/.test(proposalIntroductoryMonths.value.trim())) throw new Error('Indica os meses ao preço inicial.')
     proposalComparison.value = compareContractProposal({
       currentMonthlyCents: data.value.expense.monthlyCostCents,
       proposedMonthlyCents: parseEuros(proposalMonthlyCost.value),
       oneOffCents: parseEuros(proposalOneOffCost.value),
-      commitmentMonths: Number(proposalCommitmentMonths.value)
+      commitmentMonths: Number(proposalCommitmentMonths.value),
+      ...(proposalHasLaterPrice.value ? {
+        introductoryMonths: Number(proposalIntroductoryMonths.value),
+        laterMonthlyCents: parseEuros(proposalLaterMonthlyCost.value)
+      } : {})
     })
   } catch (caught) {
     proposalError.value = (caught as Error).message
@@ -111,7 +119,8 @@ const proposalOutcome = computed(() => {
 })
 const proposalBreakEven = computed(() => {
   const comparison = proposalComparison.value
-  if (!comparison || comparison.breakEvenMonth === null) return 'Sem ponto de equilíbrio: a mensalidade proposta não é inferior à atual.'
+  if (!comparison) return ''
+  if (comparison.breakEvenMonth === null) return `Não é atingido dentro dos ${comparison.commitmentMonths} meses comparados.`
   if (comparison.breakEvenMonth === 0) return 'Sem custos únicos por recuperar; a diferença mensal começa no 1.º mês.'
   return `Custos únicos recuperados no ${comparison.breakEvenMonth}.º mês, se os valores não mudarem.`
 })
@@ -479,6 +488,34 @@ const saveAgenda = async () => {
                     :aria-invalid="Boolean(proposalError)"
                   ><span>EUR</span>
                 </div>
+                <label class="proposal-comparison__toggle">
+                  <input
+                    v-model="proposalHasLaterPrice"
+                    type="checkbox"
+                  >
+                  <span>O preço aumenta durante a fidelização</span>
+                </label>
+                <template v-if="proposalHasLaterPrice">
+                  <label for="proposal-introductory-months">Meses ao preço inicial</label>
+                  <div class="proposal-comparison__months">
+                    <input
+                      id="proposal-introductory-months"
+                      v-model="proposalIntroductoryMonths"
+                      inputmode="numeric"
+                      autocomplete="off"
+                    ><span>meses</span>
+                  </div>
+                  <label for="proposal-later-monthly-cost">Mensalidade posterior</label>
+                  <div class="money-input">
+                    <input
+                      id="proposal-later-monthly-cost"
+                      v-model="proposalLaterMonthlyCost"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      placeholder="0,00"
+                    ><span>EUR</span>
+                  </div>
+                </template>
                 <label for="proposal-one-off-cost">Custo único</label>
                 <div class="money-input">
                   <input
@@ -519,9 +556,17 @@ const saveAgenda = async () => {
                   <strong>Proposta em análise</strong>
                   <dl>
                     <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
+                    <div v-if="proposalComparison.introductoryMonths">
+                      <dt>Preço inicial</dt><dd>{{ money(proposalComparison.proposedMonthlyCents) }} × {{ proposalComparison.introductoryMonths }} meses</dd>
+                    </div>
+                    <div v-if="proposalComparison.laterMonthlyCents !== undefined">
+                      <dt>Preço posterior</dt><dd>{{ money(proposalComparison.laterMonthlyCents) }} × {{ proposalComparison.laterPeriodMonths }} meses</dd>
+                    </div>
                     <div><dt>Total no período</dt><dd>{{ money(proposalComparison.proposedPeriodCents) }}</dd></div>
                     <div><dt>Equivalente mensal da proposta</dt><dd>{{ money(proposalComparison.proposedMonthlyEquivalentCents) }}</dd></div>
-                    <div><dt>Diferença recorrente mensal</dt><dd>{{ money(proposalComparison.recurringDifferenceCents) }}</dd></div>
+                    <div v-if="proposalComparison.introductoryMonths === undefined">
+                      <dt>Diferença recorrente mensal</dt><dd>{{ money(proposalComparison.recurringDifferenceCents) }}</dd>
+                    </div>
                   </dl>
                   <b>{{ proposalOutcome }}</b>
                   <p><strong>Ponto de equilíbrio</strong> · {{ proposalBreakEven }}</p>

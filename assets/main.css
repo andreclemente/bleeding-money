@@ -288,6 +288,9 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .proposal-comparison>span { color: var(--bm-muted); font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase }
 .proposal-comparison>p { margin: 0 0 2px; color: var(--bm-ink-soft); font-size: .73rem; line-height: 1.45 }
 .proposal-comparison>label { margin-top: 3px; color: var(--bm-ink-soft); font-size: .72rem; font-weight: 700 }
+.proposal-comparison>.proposal-comparison__toggle { display: flex; align-items: center; gap: 9px; margin: 3px 0; padding: 10px; border: 1px solid var(--bm-border); background: var(--bm-surface) }
+.proposal-comparison__toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--bm-accent) }
+.proposal-comparison__toggle span { line-height: 1.35 }
 .proposal-comparison>.secondary-action { width: 100%; margin-top: 4px }
 .proposal-comparison__months { display: grid; grid-template-columns: 1fr auto; align-items: center; border: 1px solid var(--bm-border-strong); background: var(--bm-surface) }
 .proposal-comparison__months input { min-width: 0; min-height: 42px; padding: 0 12px; border: 0; color: var(--bm-ink); background: transparent }

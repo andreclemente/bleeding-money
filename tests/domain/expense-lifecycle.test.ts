@@ -165,6 +165,25 @@ describe('linha de vida da despesa', () => {
     })
   })
 
+  it('calcula propostas com preço promocional sem prolongar o desconto até ao fim da fidelização', () => {
+    expect(compareContractProposal({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 2990,
+      oneOffCents: 3000,
+      commitmentMonths: 24,
+      introductoryMonths: 6,
+      laterMonthlyCents: 4590
+    })).toMatchObject({
+      introductoryMonths: 6,
+      laterMonthlyCents: 4590,
+      laterPeriodMonths: 18,
+      proposedPeriodCents: 103_560,
+      proposedMonthlyEquivalentCents: 4315,
+      periodDifferenceCents: 13_800,
+      outcome: 'lower'
+    })
+  })
+
   it('assinala propostas mais caras, não inventa ponto de equilíbrio e rejeita valores monetários inseguros', () => {
     expect(compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 2100, oneOffCents: 0, commitmentMonths: 12 })).toMatchObject({
       outcome: 'higher',
@@ -173,5 +192,7 @@ describe('linha de vida da despesa', () => {
     })
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: Number.MAX_SAFE_INTEGER, oneOffCents: 0, commitmentMonths: 12 })).toThrow(/Valor monetário inválido/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 0 })).toThrow(/Duração inválida/)
+    expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 12, introductoryMonths: 3 })).toThrow(/preço posterior/i)
+    expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 12, introductoryMonths: 13, laterMonthlyCents: 2000 })).toThrow(/Duração promocional inválida/)
   })
 })
