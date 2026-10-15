@@ -88,6 +88,8 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Depois da promoção/i)
     expect(page).toMatch(/acima do custo atual declarado/i)
     expect(page).toMatch(/vantagem acumulada começa a diminuir/i)
+    expect(page).toMatch(/vantagem acumulada esgota-se/i)
+    expect(page).toMatch(/não se esgota nos meses comparados/i)
     expect(page).toMatch(/Total no período/i)
     expect(page).toMatch(/Ponto de equilíbrio/i)
     expect(page).toMatch(/Custos únicos recuperados/i)

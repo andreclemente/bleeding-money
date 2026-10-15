@@ -248,8 +248,24 @@ describe('linha de vida da despesa', () => {
       laterRecurringDifferenceCents: -400,
       laterAnnualCents: 63_480,
       laterAnnualDifferenceCents: -4_800,
+      accumulatedAdvantageExhaustedMonth: null,
       maximumMonthlyCentsForNoIncrease: 5523,
       outcome: 'lower'
+    })
+  })
+
+  it('indica o mês em que um preço posterior mais alto esgota a vantagem promocional acumulada', () => {
+    expect(compareContractProposal({
+      currentMonthlyCents: 5000,
+      proposedMonthlyCents: 3000,
+      oneOffCents: 0,
+      commitmentMonths: 12,
+      introductoryMonths: 3,
+      laterMonthlyCents: 6000
+    })).toMatchObject({
+      accumulatedAdvantageExhaustedMonth: 9,
+      periodDifferenceCents: -3_000,
+      outcome: 'higher'
     })
   })
 

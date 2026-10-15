@@ -146,6 +146,22 @@ const proposalLaterPriceSignal = computed(() => {
   }
   return { tone: 'neutral', text: 'Depois da promoção, a mensalidade fica igual ao custo atual declarado.' }
 })
+const proposalAccumulatedAdvantageSignal = computed(() => {
+  const comparison = proposalComparison.value
+  if (!comparison || comparison.laterRecurringDifferenceCents === undefined || comparison.laterRecurringDifferenceCents >= 0) return null
+  if ((comparison.accumulatedAdvantageAtPromotionEndCents ?? 0) <= 0) return {
+    tone: 'warning',
+    text: 'O preço inicial não cria uma vantagem acumulada até ao fim da promoção, depois de incluir o custo único.'
+  }
+  if (typeof comparison.accumulatedAdvantageExhaustedMonth === 'number') return {
+    tone: 'warning',
+    text: `A vantagem acumulada esgota-se no ${comparison.accumulatedAdvantageExhaustedMonth}.º mês; daí em diante, a proposta fica mais cara no acumulado.`
+  }
+  return {
+    tone: 'neutral',
+    text: 'A vantagem acumulada não se esgota nos meses comparados, embora diminua depois da promoção.'
+  }
+})
 const proposalLaterAnnualDifference = computed(() => {
   const difference = proposalComparison.value?.laterAnnualDifferenceCents
   if (difference === undefined) return ''
@@ -637,6 +653,13 @@ const saveAgenda = async () => {
                     :class="`proposal-comparison__later-signal--${proposalLaterPriceSignal.tone}`"
                   >
                     {{ proposalLaterPriceSignal.text }}
+                  </p>
+                  <p
+                    v-if="proposalAccumulatedAdvantageSignal"
+                    class="proposal-comparison__later-signal"
+                    :class="`proposal-comparison__later-signal--${proposalAccumulatedAdvantageSignal.tone}`"
+                  >
+                    {{ proposalAccumulatedAdvantageSignal.text }}
                   </p>
                   <b>{{ proposalOutcome }}</b>
                   <p><strong>Ponto de equilíbrio</strong> · {{ proposalBreakEven }}</p>

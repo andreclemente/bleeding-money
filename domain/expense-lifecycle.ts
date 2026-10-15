@@ -57,6 +57,8 @@ export type ContractProposalComparison = {
   laterRecurringDifferenceCents?: number
   laterAnnualCents?: number
   laterAnnualDifferenceCents?: number
+  accumulatedAdvantageAtPromotionEndCents?: number
+  accumulatedAdvantageExhaustedMonth?: number | null
   firstPeriodMonths: number
   firstPeriodCents: number
   firstPeriodDifferenceCents: number
@@ -193,6 +195,10 @@ export const compareContractProposal = (input: {
   if ((laterAnnualCents !== undefined && !Number.isSafeInteger(laterAnnualCents)) || (laterAnnualDifferenceCents !== undefined && !Number.isSafeInteger(laterAnnualDifferenceCents))) {
     throw new Error('Valor monetário inválido.')
   }
+  const accumulatedAdvantageAtPromotionEndCents = hasPhasedPrice
+    ? (input.currentMonthlyCents - input.proposedMonthlyCents) * input.introductoryMonths! - input.oneOffCents
+    : undefined
+  if (accumulatedAdvantageAtPromotionEndCents !== undefined && !Number.isSafeInteger(accumulatedAdvantageAtPromotionEndCents)) throw new Error('Valor monetário inválido.')
   const firstPeriodMonths = Math.min(12, input.commitmentMonths)
   const firstIntroductoryMonths = hasPhasedPrice ? Math.min(input.introductoryMonths!, firstPeriodMonths) : firstPeriodMonths
   const firstLaterMonths = firstPeriodMonths - firstIntroductoryMonths
@@ -211,16 +217,24 @@ export const compareContractProposal = (input: {
     : Math.floor(priceLimitAvailableCents / priceLimitMonths)
   const periodDifferenceCents = currentPeriodCents - proposedPeriodCents
   let breakEvenMonth: number | null = input.oneOffCents === 0 && input.proposedMonthlyCents < input.currentMonthlyCents ? 0 : null
+  let accumulatedAdvantageExhaustedMonth: number | null = null
   let accumulatedDifferenceCents = -input.oneOffCents
   for (let month = 1; breakEvenMonth === null && month <= input.commitmentMonths; month += 1) {
     const proposedMonthlyCents = hasPhasedPrice && month > input.introductoryMonths! ? input.laterMonthlyCents! : input.proposedMonthlyCents
     accumulatedDifferenceCents += input.currentMonthlyCents - proposedMonthlyCents
     if (accumulatedDifferenceCents >= 0 && (input.oneOffCents > 0 || accumulatedDifferenceCents > 0)) breakEvenMonth = month
   }
+  if (hasPhasedPrice && laterRecurringDifferenceCents! < 0 && accumulatedAdvantageAtPromotionEndCents! > 0) {
+    accumulatedDifferenceCents = accumulatedAdvantageAtPromotionEndCents!
+    for (let month = input.introductoryMonths! + 1; accumulatedAdvantageExhaustedMonth === null && month <= input.commitmentMonths; month += 1) {
+      accumulatedDifferenceCents += laterRecurringDifferenceCents!
+      if (accumulatedDifferenceCents <= 0) accumulatedAdvantageExhaustedMonth = month
+    }
+  }
 
   return {
     ...input,
-    ...(hasPhasedPrice ? { laterPeriodMonths, laterRecurringDifferenceCents, laterAnnualCents, laterAnnualDifferenceCents } : {}),
+    ...(hasPhasedPrice ? { laterPeriodMonths, laterRecurringDifferenceCents, laterAnnualCents, laterAnnualDifferenceCents, accumulatedAdvantageAtPromotionEndCents, accumulatedAdvantageExhaustedMonth } : {}),
     currentPeriodCents,
     proposedPeriodCents,
     firstMonthCents,
