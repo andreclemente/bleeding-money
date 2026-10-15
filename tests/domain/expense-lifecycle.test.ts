@@ -190,6 +190,10 @@ describe('linha de vida da despesa', () => {
       recurringDifferenceCents: -100,
       breakEvenMonth: null
     })
+    expect(compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 2000, oneOffCents: 0, commitmentMonths: 12 })).toMatchObject({
+      outcome: 'same',
+      breakEvenMonth: null
+    })
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: Number.MAX_SAFE_INTEGER, oneOffCents: 0, commitmentMonths: 12 })).toThrow(/Valor monetário inválido/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 0 })).toThrow(/Duração inválida/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 12, introductoryMonths: 3 })).toThrow(/preço posterior/i)

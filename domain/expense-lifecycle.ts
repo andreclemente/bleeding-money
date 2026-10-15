@@ -180,7 +180,7 @@ export const compareContractProposal = (input: {
   for (let month = 1; breakEvenMonth === null && month <= input.commitmentMonths; month += 1) {
     const proposedMonthlyCents = hasPhasedPrice && month > input.introductoryMonths! ? input.laterMonthlyCents! : input.proposedMonthlyCents
     accumulatedDifferenceCents += input.currentMonthlyCents - proposedMonthlyCents
-    if (accumulatedDifferenceCents >= 0) breakEvenMonth = month
+    if (accumulatedDifferenceCents >= 0 && (input.oneOffCents > 0 || accumulatedDifferenceCents > 0)) breakEvenMonth = month
   }
 
   return {
