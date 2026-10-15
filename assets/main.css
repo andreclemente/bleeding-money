@@ -727,8 +727,9 @@ h1, h2 { font-family: inherit; font-weight: 400 }
 .renewal-radar li+li { border-top: 1px solid #f1c21b }
 .renewal-radar a { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; text-decoration: none }
 .renewal-radar a:hover { background: #fddc69 }
-.renewal-radar span strong, .renewal-radar span small { display: block }
+.renewal-radar span strong, .renewal-radar span small, .renewal-radar span em { display: block }
 .renewal-radar span small { margin-top: 4px; color: var(--bm-muted); font-size: .72rem }
+.renewal-radar span em { margin-top: 5px; color: var(--bm-ink); font-size: .76rem; font-style: normal }
 .renewal-radar b { font-size: .82rem }
 .contract-table { border-top: 1px solid var(--bm-ink) }
 .contract-row { display: grid; min-height: 78px; grid-template-columns: 54px minmax(180px, 1.4fr) minmax(130px, .7fr) 110px 120px 24px; align-items: center; gap: 16px; padding: 12px 8px; border-bottom: 1px solid var(--bm-border); color: inherit; text-decoration: none }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { buildContractRadar, getNextDeclaredContractDate } from '../../domain/contract-agenda'
 import type { ExpenseCategory, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const store = useSavingsStore()
@@ -20,21 +21,10 @@ const openFindingCount = (expenseId: string) => openFindings.value.filter((item:
 const categoryLabel = (category: ExpenseCategory) => categoryMeta[category].label
 const categoryCode = (category: ExpenseCategory) => categoryMeta[category].code
 const monthlyTotal = computed(() => expenses.value.reduce((sum: number, item: RecurringExpense) => sum + item.monthlyCostCents, 0))
-const renewalDate = (item: RecurringExpense) => item.details.kind === 'insurance' ? item.details.renewalDate : undefined
-const renewalLabel = (item: RecurringExpense) => {
-  const value = renewalDate(item)
-  return value ? civilDate(value) : 'Sem prazo'
-}
-const daysUntil = (value: string) => {
-  const today = new Date()
-  const current = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-  return Math.ceil((Date.parse(`${value}T00:00:00Z`) - current) / 86_400_000)
-}
-const radarItems = computed<Array<{ item: RecurringExpense, date: string, days: number }>>(() => expenses.value
-  .filter((item: RecurringExpense) => renewalDate(item))
-  .map((item: RecurringExpense) => ({ item, date: renewalDate(item)!, days: daysUntil(renewalDate(item)!) }))
-  .filter((entry: { days: number }) => entry.days >= 0 && entry.days <= 45)
-  .sort((left: { days: number }, right: { days: number }) => left.days - right.days))
+const today = new Date()
+const currentCivilDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+const radarItems = computed(() => buildContractRadar(expenses.value, currentCivilDate, 45))
+const contractListDate = (item: RecurringExpense) => getNextDeclaredContractDate(item, currentCivilDate)
 </script>
 
 <template>
@@ -46,7 +36,7 @@ const radarItems = computed<Array<{ item: RecurringExpense, date: string, days: 
         </div>
         <h1>Contratos</h1>
         <p class="page-subtitle">
-          O que sai todos os meses, o que precisa de atenção e o que se aproxima da renovação.
+          O que sai todos os meses, o que precisa de atenção e os prazos declarados que se aproximam.
         </p>
       </div>
       <NuxtLink
@@ -75,18 +65,19 @@ const radarItems = computed<Array<{ item: RecurringExpense, date: string, days: 
       aria-labelledby="radar-title"
     >
       <div>
-        <span class="data-label">Radar de renovação</span><h2 id="radar-title">
+        <span class="data-label">Radar de decisões</span><h2 id="radar-title">
           Decidir antes do prazo
         </h2>
+        <p>Fidelização, renovação e fim de contrato continuam separados.</p>
       </div>
       <ol>
         <li
           v-for="entry in radarItems"
-          :key="entry.item.id"
+          :key="`${entry.expenseId}-${entry.kind}-${entry.date}`"
         >
-          <NuxtLink :to="`/expenses/${entry.item.id}`">
-            <span><strong>{{ entry.item.productName }}</strong><small>{{ entry.item.provider }} · renova {{ civilDate(entry.date) }}</small></span>
-            <b>{{ entry.days === 0 ? 'Hoje' : `${entry.days} dias` }}</b>
+          <NuxtLink :to="`/expenses/${entry.expenseId}`">
+            <span><strong>{{ entry.productName }}</strong><small>{{ entry.provider }} · {{ entry.label }} · {{ civilDate(entry.date) }}</small><em>{{ entry.action }}</em></span>
+            <b>{{ entry.daysUntil === 0 ? 'Hoje' : entry.daysUntil === 1 ? 'Amanhã' : `${entry.daysUntil} dias` }}</b>
           </NuxtLink>
         </li>
       </ol>
@@ -132,13 +123,13 @@ const radarItems = computed<Array<{ item: RecurringExpense, date: string, days: 
           <span class="contract-code">{{ categoryCode(item.category) }}</span>
           <span class="contract-identity"><strong>{{ item.productName }}</strong><small>{{ item.provider }} · {{ categoryLabel(item.category) }}</small></span>
           <span
-            v-if="renewalDate(item)"
+            v-if="contractListDate(item)"
             class="contract-date"
-          ><small>Renovação</small>{{ renewalLabel(item) }}</span>
+          ><small>Próximo prazo</small>{{ contractListDate(item)!.label }} · {{ civilDate(contractListDate(item)!.date) }}</span>
           <span
             v-else
             class="contract-date"
-          ><small>Revisão</small>Sem prazo</span>
+          ><small>Próximo prazo</small>Sem prazo futuro</span>
           <span
             class="contract-status"
             :class="openFindingCount(item.id) ? 'contract-status--attention' : 'contract-status--clear'"

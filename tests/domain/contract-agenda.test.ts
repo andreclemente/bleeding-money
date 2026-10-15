@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractAgendaPatch } from '../../domain/contract-agenda'
+import { buildContractAgendaPatch, buildContractRadar, getNextDeclaredContractDate } from '../../domain/contract-agenda'
 import type { RecurringExpense } from '../../domain/types'
 
 const insurance: RecurringExpense = {
@@ -37,5 +37,73 @@ describe('agenda contratual', () => {
       commitmentEndDate: '2026-01-01',
       renewalDate: '2026-11-15'
     })).toThrow(/data diferente/i)
+  })
+
+  it('leva todos os prazos contratuais próximos para o radar, não apenas renovações de seguros', () => {
+    const telecom: RecurringExpense = {
+      ...insurance,
+      id: 'expense-2',
+      category: 'telecom',
+      provider: 'Operador',
+      productName: 'Fibra',
+      commitmentEndDate: '2026-10-20',
+      contractEndDate: '2026-11-10',
+      details: { kind: 'telecom', connectionType: 'fiber', downloadSpeedMbps: 500 }
+    }
+
+    expect(buildContractRadar([insurance, telecom], '2026-10-15', 45)).toEqual([
+      {
+        expenseId: 'expense-2',
+        productName: 'Fibra',
+        provider: 'Operador',
+        kind: 'commitment',
+        label: 'Fim da fidelização',
+        date: '2026-10-20',
+        daysUntil: 5,
+        action: 'Preparar renegociação ou mudança.'
+      },
+      {
+        expenseId: 'expense-2',
+        productName: 'Fibra',
+        provider: 'Operador',
+        kind: 'contract',
+        label: 'Fim do contrato',
+        date: '2026-11-10',
+        daysUntil: 26,
+        action: 'Confirmar continuação ou termo.'
+      },
+      {
+        expenseId: 'expense-1',
+        productName: 'Casa',
+        provider: 'Seguradora',
+        kind: 'renewal',
+        label: 'Próxima renovação',
+        date: '2026-11-15',
+        daysUntil: 31,
+        action: 'Confirmar condições de renovação.'
+      }
+    ])
+  })
+
+  it('exclui prazos passados ou fora da janela sem inventar alertas', () => {
+    expect(buildContractRadar([insurance], '2026-12-01', 45)).toEqual([])
+    expect(() => buildContractRadar([insurance], '2026-02-31', 45)).toThrow(/Data civil inválida/)
+  })
+
+  it('identifica o próximo prazo declarado para o inventário, independentemente da categoria', () => {
+    const telecom: RecurringExpense = {
+      ...insurance,
+      category: 'telecom',
+      commitmentEndDate: '2026-10-20',
+      contractEndDate: '2026-11-10',
+      details: { kind: 'telecom', connectionType: 'fiber', downloadSpeedMbps: 500 }
+    }
+
+    expect(getNextDeclaredContractDate(telecom, '2026-10-15')).toEqual({
+      kind: 'commitment',
+      label: 'Fim da fidelização',
+      date: '2026-10-20'
+    })
+    expect(getNextDeclaredContractDate(telecom, '2026-12-01')).toBeNull()
   })
 })
