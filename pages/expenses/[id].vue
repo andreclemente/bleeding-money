@@ -124,6 +124,15 @@ const proposalBreakEven = computed(() => {
   if (comparison.breakEvenMonth === 0) return 'Sem custos únicos por recuperar; a diferença mensal começa no 1.º mês.'
   return `Custos únicos recuperados no ${comparison.breakEvenMonth}.º mês, se os valores não mudarem.`
 })
+const proposalPriceLimit = computed(() => {
+  const comparison = proposalComparison.value
+  if (!comparison) return ''
+  if (comparison.maximumMonthlyCentsForNoIncrease === null) {
+    return 'Os custos únicos são tão altos que nem uma mensalidade de 0 € evita pagar mais no período indicado.'
+  }
+  const label = comparison.introductoryMonths === undefined ? 'mensalidade máxima' : 'mensalidade posterior máxima'
+  return `${label}: ${money(comparison.maximumMonthlyCentsForNoIncrease)}. Acima deste valor, a proposta passa a custar mais no período indicado.`
+})
 const proposalLaterPriceSignal = computed(() => {
   const difference = proposalComparison.value?.laterRecurringDifferenceCents
   if (difference === undefined) return null
@@ -590,6 +599,7 @@ const saveAgenda = async () => {
                   </p>
                   <b>{{ proposalOutcome }}</b>
                   <p><strong>Ponto de equilíbrio</strong> · {{ proposalBreakEven }}</p>
+                  <p><strong>Limite para não pagar mais</strong> · {{ proposalPriceLimit }}</p>
                   <small>{{ proposalComparison.rule }}</small>
                 </div>
               </form>

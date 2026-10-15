@@ -158,6 +158,7 @@ describe('linha de vida da despesa', () => {
       proposedPeriodCents: 100760,
       proposedMonthlyEquivalentCents: 4198,
       recurringDifferenceCents: 900,
+      maximumMonthlyCentsForNoIncrease: 4681,
       breakEvenMonth: 6,
       periodDifferenceCents: 16600,
       outcome: 'lower',
@@ -180,6 +181,7 @@ describe('linha de vida da despesa', () => {
       proposedPeriodCents: 103_560,
       proposedMonthlyEquivalentCents: 4315,
       laterRecurringDifferenceCents: 300,
+      maximumMonthlyCentsForNoIncrease: 5356,
       periodDifferenceCents: 13_800,
       outcome: 'lower'
     })
@@ -195,7 +197,20 @@ describe('linha de vida da despesa', () => {
       laterMonthlyCents: 5290
     })).toMatchObject({
       laterRecurringDifferenceCents: -400,
+      maximumMonthlyCentsForNoIncrease: 5523,
       outcome: 'lower'
+    })
+  })
+
+  it('indica quando nem uma mensalidade gratuita compensa o custo único', () => {
+    expect(compareContractProposal({
+      currentMonthlyCents: 1000,
+      proposedMonthlyCents: 0,
+      oneOffCents: 13_000,
+      commitmentMonths: 12
+    })).toMatchObject({
+      maximumMonthlyCentsForNoIncrease: null,
+      outcome: 'higher'
     })
   })
 

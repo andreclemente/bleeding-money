@@ -53,6 +53,7 @@ export type ContractProposalComparison = {
   laterMonthlyCents?: number
   laterPeriodMonths?: number
   laterRecurringDifferenceCents?: number
+  maximumMonthlyCentsForNoIncrease: number | null
   periodDifferenceCents: number
   outcome: 'lower' | 'same' | 'higher'
   rule: string
@@ -177,6 +178,14 @@ export const compareContractProposal = (input: {
   if (!Number.isSafeInteger(recurringDifferenceCents)) throw new Error('Valor monetário inválido.')
   const laterRecurringDifferenceCents = hasPhasedPrice ? input.currentMonthlyCents - input.laterMonthlyCents! : undefined
   if (laterRecurringDifferenceCents !== undefined && !Number.isSafeInteger(laterRecurringDifferenceCents)) throw new Error('Valor monetário inválido.')
+  const priceLimitAvailableCents = hasPhasedPrice
+    ? currentPeriodCents - input.oneOffCents - input.proposedMonthlyCents * input.introductoryMonths!
+    : currentPeriodCents - input.oneOffCents
+  if (!Number.isSafeInteger(priceLimitAvailableCents)) throw new Error('Valor monetário inválido.')
+  const priceLimitMonths = hasPhasedPrice ? laterPeriodMonths : input.commitmentMonths
+  const maximumMonthlyCentsForNoIncrease = priceLimitAvailableCents < 0
+    ? null
+    : Math.floor(priceLimitAvailableCents / priceLimitMonths)
   const periodDifferenceCents = currentPeriodCents - proposedPeriodCents
   let breakEvenMonth: number | null = input.oneOffCents === 0 && input.proposedMonthlyCents < input.currentMonthlyCents ? 0 : null
   let accumulatedDifferenceCents = -input.oneOffCents
@@ -193,6 +202,7 @@ export const compareContractProposal = (input: {
     proposedPeriodCents,
     proposedMonthlyEquivalentCents: Math.round(proposedPeriodCents / input.commitmentMonths),
     recurringDifferenceCents,
+    maximumMonthlyCentsForNoIncrease,
     breakEvenMonth,
     periodDifferenceCents,
     outcome: periodDifferenceCents > 0 ? 'lower' : periodDifferenceCents < 0 ? 'higher' : 'same',
