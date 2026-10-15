@@ -55,6 +55,9 @@ export type ContractProposalComparison = {
   laterRecurringDifferenceCents?: number
   laterAnnualCents?: number
   laterAnnualDifferenceCents?: number
+  firstPeriodMonths: number
+  firstPeriodCents: number
+  firstPeriodDifferenceCents: number
   maximumMonthlyCentsForNoIncrease: number | null
   periodDifferenceCents: number
   outcome: 'lower' | 'same' | 'higher'
@@ -185,6 +188,14 @@ export const compareContractProposal = (input: {
   if ((laterAnnualCents !== undefined && !Number.isSafeInteger(laterAnnualCents)) || (laterAnnualDifferenceCents !== undefined && !Number.isSafeInteger(laterAnnualDifferenceCents))) {
     throw new Error('Valor monetário inválido.')
   }
+  const firstPeriodMonths = Math.min(12, input.commitmentMonths)
+  const firstIntroductoryMonths = hasPhasedPrice ? Math.min(input.introductoryMonths!, firstPeriodMonths) : firstPeriodMonths
+  const firstLaterMonths = firstPeriodMonths - firstIntroductoryMonths
+  const firstPeriodCents = input.oneOffCents
+    + input.proposedMonthlyCents * firstIntroductoryMonths
+    + (hasPhasedPrice ? input.laterMonthlyCents! * firstLaterMonths : 0)
+  const firstPeriodDifferenceCents = input.currentMonthlyCents * firstPeriodMonths - firstPeriodCents
+  if (!Number.isSafeInteger(firstPeriodCents) || !Number.isSafeInteger(firstPeriodDifferenceCents)) throw new Error('Valor monetário inválido.')
   const priceLimitAvailableCents = hasPhasedPrice
     ? currentPeriodCents - input.oneOffCents - input.proposedMonthlyCents * input.introductoryMonths!
     : currentPeriodCents - input.oneOffCents
@@ -207,6 +218,9 @@ export const compareContractProposal = (input: {
     ...(hasPhasedPrice ? { laterPeriodMonths, laterRecurringDifferenceCents, laterAnnualCents, laterAnnualDifferenceCents } : {}),
     currentPeriodCents,
     proposedPeriodCents,
+    firstPeriodMonths,
+    firstPeriodCents,
+    firstPeriodDifferenceCents,
     proposedMonthlyEquivalentCents: Math.round(proposedPeriodCents / input.commitmentMonths),
     recurringDifferenceCents,
     maximumMonthlyCentsForNoIncrease,

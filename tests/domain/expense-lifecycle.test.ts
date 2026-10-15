@@ -156,6 +156,9 @@ describe('linha de vida da despesa', () => {
       commitmentMonths: 24,
       currentPeriodCents: 117360,
       proposedPeriodCents: 100760,
+      firstPeriodMonths: 12,
+      firstPeriodCents: 52_880,
+      firstPeriodDifferenceCents: 5_800,
       proposedMonthlyEquivalentCents: 4198,
       recurringDifferenceCents: 900,
       maximumMonthlyCentsForNoIncrease: 4681,
@@ -180,12 +183,41 @@ describe('linha de vida da despesa', () => {
       laterPeriodMonths: 18,
       laterAnnualCents: 55_080,
       laterAnnualDifferenceCents: 3_600,
+      firstPeriodMonths: 12,
+      firstPeriodCents: 48_480,
+      firstPeriodDifferenceCents: 10_200,
       proposedPeriodCents: 103_560,
       proposedMonthlyEquivalentCents: 4315,
       laterRecurringDifferenceCents: 300,
       maximumMonthlyCentsForNoIncrease: 5356,
       periodDifferenceCents: 13_800,
       outcome: 'lower'
+    })
+  })
+
+  it('expõe o custo real do primeiro ano incluindo promoção e custo único', () => {
+    expect(compareContractProposal({
+      currentMonthlyCents: 5000,
+      proposedMonthlyCents: 2500,
+      oneOffCents: 6000,
+      commitmentMonths: 24,
+      introductoryMonths: 3,
+      laterMonthlyCents: 5500
+    })).toMatchObject({
+      firstPeriodMonths: 12,
+      firstPeriodCents: 63_000,
+      firstPeriodDifferenceCents: -3_000
+    })
+
+    expect(compareContractProposal({
+      currentMonthlyCents: 5000,
+      proposedMonthlyCents: 4000,
+      oneOffCents: 1000,
+      commitmentMonths: 6
+    })).toMatchObject({
+      firstPeriodMonths: 6,
+      firstPeriodCents: 25_000,
+      firstPeriodDifferenceCents: 5_000
     })
   })
 

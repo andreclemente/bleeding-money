@@ -153,6 +153,13 @@ const proposalLaterAnnualDifference = computed(() => {
   if (difference < 0) return `${money(Math.abs(difference))} mais por ano face ao custo atual declarado.`
   return 'O mesmo custo anual face ao custo atual declarado.'
 })
+const proposalFirstPeriodDifference = computed(() => {
+  const difference = proposalComparison.value?.firstPeriodDifferenceCents
+  if (difference === undefined) return ''
+  if (difference > 0) return `${money(difference)} menos face ao custo atual no mesmo período.`
+  if (difference < 0) return `${money(Math.abs(difference))} mais face ao custo atual no mesmo período.`
+  return 'O mesmo custo face ao custo atual no mesmo período.'
+})
 const openValueEditor = () => {
   newMonthlyCost.value = data.value ? String(data.value.expense.monthlyCostCents / 100).replace('.', ',') : ''
   valueError.value = ''
@@ -593,6 +600,9 @@ const saveAgenda = async () => {
                     </div>
                     <div v-if="proposalComparison.laterAnnualCents !== undefined">
                       <dt>Custo anual depois da promoção</dt><dd>{{ money(proposalComparison.laterAnnualCents) }} · {{ proposalLaterAnnualDifference }}</dd>
+                    </div>
+                    <div>
+                      <dt>Custo nos primeiros {{ proposalComparison.firstPeriodMonths }} meses</dt><dd>{{ money(proposalComparison.firstPeriodCents) }} · inclui o custo único · {{ proposalFirstPeriodDifference }}</dd>
                     </div>
                     <div><dt>Total no período</dt><dd>{{ money(proposalComparison.proposedPeriodCents) }}</dd></div>
                     <div><dt>Equivalente mensal da proposta</dt><dd>{{ money(proposalComparison.proposedMonthlyEquivalentCents) }}</dd></div>
