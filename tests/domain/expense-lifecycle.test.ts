@@ -156,6 +156,8 @@ describe('linha de vida da despesa', () => {
       commitmentMonths: 24,
       currentPeriodCents: 117360,
       proposedPeriodCents: 100760,
+      firstMonthCents: 8990,
+      firstMonthDifferenceCents: -4100,
       firstPeriodMonths: 12,
       firstPeriodCents: 52_880,
       firstPeriodDifferenceCents: 5_800,
@@ -218,6 +220,19 @@ describe('linha de vida da despesa', () => {
       firstPeriodMonths: 6,
       firstPeriodCents: 25_000,
       firstPeriodDifferenceCents: 5_000
+    })
+  })
+
+  it('expõe o esforço de tesouraria do primeiro mês sem o diluir no equivalente mensal', () => {
+    expect(compareContractProposal({
+      currentMonthlyCents: 5000,
+      proposedMonthlyCents: 3500,
+      oneOffCents: 9000,
+      commitmentMonths: 24
+    })).toMatchObject({
+      firstMonthCents: 12_500,
+      firstMonthDifferenceCents: -7_500,
+      outcome: 'lower'
     })
   })
 

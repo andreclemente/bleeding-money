@@ -160,6 +160,19 @@ const proposalFirstPeriodDifference = computed(() => {
   if (difference < 0) return `${money(Math.abs(difference))} mais face ao custo atual no mesmo período.`
   return 'O mesmo custo face ao custo atual no mesmo período.'
 })
+const proposalFirstMonthSignal = computed(() => {
+  const difference = proposalComparison.value?.firstMonthDifferenceCents
+  if (difference === undefined) return null
+  if (difference < 0) return {
+    tone: 'warning',
+    text: `Esforço inicial: ${money(Math.abs(difference))} mais do que o custo atual no primeiro mês.`
+  }
+  if (difference > 0) return {
+    tone: 'positive',
+    text: `Esforço inicial: ${money(difference)} menos do que o custo atual no primeiro mês.`
+  }
+  return { tone: 'neutral', text: 'Esforço inicial igual ao custo atual no primeiro mês.' }
+})
 const openValueEditor = () => {
   newMonthlyCost.value = data.value ? String(data.value.expense.monthlyCostCents / 100).replace('.', ',') : ''
   valueError.value = ''
@@ -592,6 +605,7 @@ const saveAgenda = async () => {
                   <strong>Proposta em análise</strong>
                   <dl>
                     <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
+                    <div><dt>Custo no 1.º mês</dt><dd>{{ money(proposalComparison.firstMonthCents) }} · inclui o custo único</dd></div>
                     <div v-if="proposalComparison.introductoryMonths">
                       <dt>Preço inicial</dt><dd>{{ money(proposalComparison.proposedMonthlyCents) }} × {{ proposalComparison.introductoryMonths }} meses</dd>
                     </div>
@@ -610,6 +624,13 @@ const saveAgenda = async () => {
                       <dt>Diferença recorrente mensal</dt><dd>{{ money(proposalComparison.recurringDifferenceCents) }}</dd>
                     </div>
                   </dl>
+                  <p
+                    v-if="proposalFirstMonthSignal"
+                    class="proposal-comparison__later-signal"
+                    :class="`proposal-comparison__later-signal--${proposalFirstMonthSignal.tone}`"
+                  >
+                    {{ proposalFirstMonthSignal.text }}
+                  </p>
                   <p
                     v-if="proposalLaterPriceSignal"
                     class="proposal-comparison__later-signal"
