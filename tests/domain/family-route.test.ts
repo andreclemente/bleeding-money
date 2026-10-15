@@ -95,7 +95,30 @@ describe('Rota Familiar', () => {
       goal: null
     })
 
-    expect(route.nextAction).toMatchObject({ kind: 'insurance_renewal', expenseId: 'insurance-soon', daysUntil: 15 })
+    expect(route.nextAction).toMatchObject({ kind: 'contract_deadline', expenseId: 'insurance-soon', eventKind: 'renewal', label: 'Próxima renovação', daysUntil: 15 })
+  })
+
+  it('leva o fim de fidelização de qualquer contrato para a missão familiar', () => {
+    const telecom = expense('telecom-deadline', { commitmentEndDate: '2026-09-20' })
+
+    const route = buildFamilyRoute({
+      civilDate: '2026-09-09',
+      expenses: [telecom, expense('contract')],
+      findings: [finding('estimated', 'contract')],
+      actions: [],
+      periods: [],
+      goal: null
+    })
+
+    expect(route.nextAction).toEqual({
+      kind: 'contract_deadline',
+      expenseId: 'telecom-deadline',
+      eventKind: 'commitment',
+      label: 'Fim da fidelização',
+      action: 'Preparar renegociação ou mudança.',
+      date: '2026-09-20',
+      daysUntil: 11
+    })
   })
 
   it('agrupa findings abertos num único caso por despesa sem somar intervalos sobrepostos', () => {
@@ -166,7 +189,7 @@ describe('Rota Familiar', () => {
     const base = { civilDate: '2026-09-09', expenses: [renewal, expense('contract')], actions: [], periods: [latest], goal: null }
 
     expect(buildFamilyRoute({ ...base, findings: [finding('estimated', 'contract')] }).nextAction.kind).toBe('estimated_finding')
-    expect(buildFamilyRoute({ ...base, findings: [] }).nextAction).toMatchObject({ kind: 'insurance_renewal', daysUntil: 45 })
+    expect(buildFamilyRoute({ ...base, findings: [] }).nextAction).toMatchObject({ kind: 'contract_deadline', eventKind: 'renewal', daysUntil: 45 })
   })
 
   it('propõe ligar reduções confirmadas a um objetivo ainda por definir', () => {

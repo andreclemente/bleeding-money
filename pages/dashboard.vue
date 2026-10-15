@@ -17,10 +17,11 @@ const actionView = computed(() => {
   const route = dashboard.value
   if (!route) return null
   const action = route.nextAction
-  if (action.kind === 'insurance_renewal') {
+  if (action.kind === 'contract_deadline') {
     const item = route.cases.find((item: FamilyAuditCase) => item.expense.id === action.expenseId)?.expense
       || store.expenses.find((expense: RecurringExpense) => expense.id === action.expenseId)
-    return { signal: 'Prazo', title: `Rever ${item?.productName || 'seguro'}`, body: `Faltam ${action.daysUntil} dias para a renovação. Confirma coberturas, prémio e condições.`, why: 'Os prazos até 15 dias passam à frente das restantes oportunidades.', href: `/expenses/${action.expenseId}`, cta: 'Abrir contrato' }
+    const remaining = action.daysUntil === 0 ? 'é hoje' : `faltam ${action.daysUntil} ${action.daysUntil === 1 ? 'dia' : 'dias'}`
+    return { signal: action.label, title: `Rever ${item?.productName || 'contrato'}`, body: `${date(action.date)} · ${remaining}. ${action.action}`, why: action.daysUntil <= 15 ? 'É a data declarada mais próxima e está a 15 dias ou menos.' : 'Não há um caso estimado prioritário; esta é a data declarada mais próxima nos próximos 45 dias.', href: `/expenses/${action.expenseId}`, cta: 'Abrir contrato' }
   }
   if (action.kind === 'estimated_finding' || action.kind === 'factual_finding') {
     const item = route.cases.find((item: FamilyAuditCase) => item.finding.id === action.findingId)

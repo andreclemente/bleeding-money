@@ -1,9 +1,10 @@
 import { calculateMoneyAtRisk, type MonthlySpendPeriod } from './spending'
+import { buildContractRadar, type ContractRadarItem } from './contract-agenda'
 import type { SavingsGoalProgress } from './savings-goal'
 import type { RecurringExpense, SavingAction, SavingsFinding } from './types'
 
 export type FamilyRouteAction =
-  | { kind: 'insurance_renewal', expenseId: string, daysUntil: number }
+  | { kind: 'contract_deadline', expenseId: string, eventKind: ContractRadarItem['kind'], label: string, action: string, date: string, daysUntil: number }
   | { kind: 'estimated_finding', expenseId: string, findingId: string }
   | { kind: 'spending_limit_experiment', periodId: string, conditionalAnnualCents: number }
   | { kind: 'factual_finding', expenseId: string, findingId: string }
@@ -30,7 +31,6 @@ export interface FamilyRouteInput {
 }
 
 const civilDatePattern = /^\d{4}-\d{2}-\d{2}$/
-const dayMs = 86_400_000
 const utcDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 const assertMoney = (value: number) => {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error('Valor monetário inválido')
@@ -45,14 +45,15 @@ const isEstimated = (finding: SavingsFinding) => finding.estimatedMonthlySavingM
 const findingOrder = (left: SavingsFinding, right: SavingsFinding) => right.priority - left.priority || left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id)
 const routeFindingOrder = (left: SavingsFinding, right: SavingsFinding) => Number(isEstimated(right)) - Number(isEstimated(left)) || findingOrder(left, right)
 
-const renewalCandidates = (expenses: RecurringExpense[], civilDate: string) => expenses
-  .flatMap(expense => {
-    const renewalDate = expense.details.kind === 'insurance' ? expense.details.renewalDate : undefined
-    if (!renewalDate) return []
-    const daysUntil = (utcDay(renewalDate) - utcDay(civilDate)) / dayMs
-    return Number.isInteger(daysUntil) && daysUntil >= 0 && daysUntil <= 45 ? [{ expenseId: expense.id, daysUntil }] : []
-  })
-  .sort((left, right) => left.daysUntil - right.daysUntil || left.expenseId.localeCompare(right.expenseId))
+const deadlineAction = (item: ContractRadarItem): FamilyRouteAction => ({
+  kind: 'contract_deadline',
+  expenseId: item.expenseId,
+  eventKind: item.kind,
+  label: item.label,
+  action: item.action,
+  date: item.date,
+  daysUntil: item.daysUntil
+})
 
 export const buildFamilyRoute = (input: FamilyRouteInput) => {
   if (!civilDatePattern.test(input.civilDate) || Number.isNaN(utcDay(input.civilDate)) || new Date(utcDay(input.civilDate)).toISOString().slice(0, 10) !== input.civilDate) throw new Error('Data civil inválida')
@@ -101,16 +102,16 @@ export const buildFamilyRoute = (input: FamilyRouteInput) => {
   const plan = latestPeriod ? calculateMoneyAtRisk(latestPeriod.amounts) : null
   const conditionalAnnualPlanCents = plan?.annualCents || 0
   const confirmedAnnualCents = input.actions.reduce((sum, action) => addMoney(sum, action.annualSavingCents), 0)
-  const renewals = renewalCandidates(input.expenses, input.civilDate)
-  const urgentRenewal = renewals.find(item => item.daysUntil <= 15)
-  const laterRenewal = renewals.find(item => item.daysUntil >= 16)
+  const deadlines = buildContractRadar(input.expenses, input.civilDate)
+  const urgentDeadline = deadlines.find(item => item.daysUntil <= 15)
+  const laterDeadline = deadlines.find(item => item.daysUntil >= 16)
   const estimatedCase = estimatedCases[0]
   const factualCase = cases.find(item => item.evidenceKind === 'fact')
 
   let nextAction: FamilyRouteAction
-  if (urgentRenewal) nextAction = { kind: 'insurance_renewal', ...urgentRenewal }
+  if (urgentDeadline) nextAction = deadlineAction(urgentDeadline)
   else if (estimatedCase) nextAction = { kind: 'estimated_finding', expenseId: estimatedCase.expense.id, findingId: estimatedCase.finding.id }
-  else if (laterRenewal) nextAction = { kind: 'insurance_renewal', ...laterRenewal }
+  else if (laterDeadline) nextAction = deadlineAction(laterDeadline)
   else if (latestPeriod && conditionalAnnualPlanCents > 0) nextAction = { kind: 'spending_limit_experiment', periodId: latestPeriod.id, conditionalAnnualCents: conditionalAnnualPlanCents }
   else if (factualCase) nextAction = { kind: 'factual_finding', expenseId: factualCase.expense.id, findingId: factualCase.finding.id }
   else if (!input.goal && confirmedAnnualCents > 0) nextAction = { kind: 'define_goal', confirmedAnnualCents }

@@ -35,4 +35,14 @@ describe('Hoje', () => {
     expect(page).toMatch(/atualiz/i)
     expect(page).not.toMatch(/vigilância|automaticamente|segundo plano/i)
   })
+
+  it('transforma qualquer prazo contratual próximo numa missão concreta', async () => {
+    const page = await readFile(new URL('../../pages/dashboard.vue', import.meta.url), 'utf8')
+
+    expect(page).toContain("action.kind === 'contract_deadline'")
+    expect(page).toContain('action.label')
+    expect(page).toContain('action.action')
+    expect(page).toContain('data declarada')
+    expect(page).not.toContain("action.kind === 'insurance_renewal'")
+  })
 })
