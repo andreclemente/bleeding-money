@@ -47,6 +47,8 @@ export type ContractProposalComparison = {
   currentPeriodCents: number
   proposedPeriodCents: number
   proposedMonthlyEquivalentCents: number
+  recurringDifferenceCents: number
+  breakEvenMonth: number | null
   periodDifferenceCents: number
   outcome: 'lower' | 'same' | 'higher'
   rule: string
@@ -155,6 +157,8 @@ export const compareContractProposal = (input: {
   const currentPeriodCents = input.currentMonthlyCents * input.commitmentMonths
   const proposedPeriodCents = input.proposedMonthlyCents * input.commitmentMonths + input.oneOffCents
   if (!Number.isSafeInteger(currentPeriodCents) || !Number.isSafeInteger(proposedPeriodCents)) throw new Error('Valor monetário inválido.')
+  const recurringDifferenceCents = input.currentMonthlyCents - input.proposedMonthlyCents
+  if (!Number.isSafeInteger(recurringDifferenceCents)) throw new Error('Valor monetário inválido.')
   const periodDifferenceCents = currentPeriodCents - proposedPeriodCents
 
   return {
@@ -162,6 +166,8 @@ export const compareContractProposal = (input: {
     currentPeriodCents,
     proposedPeriodCents,
     proposedMonthlyEquivalentCents: Math.round(proposedPeriodCents / input.commitmentMonths),
+    recurringDifferenceCents,
+    breakEvenMonth: recurringDifferenceCents > 0 ? Math.ceil(input.oneOffCents / recurringDifferenceCents) : null,
     periodDifferenceCents,
     outcome: periodDifferenceCents > 0 ? 'lower' : periodDifferenceCents < 0 ? 'higher' : 'same',
     rule: 'Comparação condicional: assume o custo atual constante durante o período; não confirma poupança.'

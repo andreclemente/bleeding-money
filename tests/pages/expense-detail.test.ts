@@ -73,6 +73,8 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Comparar proposta recebida/i)
     expect(page).toMatch(/Custo único/i)
     expect(page).toMatch(/Total no período/i)
+    expect(page).toMatch(/Ponto de equilíbrio/i)
+    expect(page).toMatch(/Custos únicos recuperados/i)
     expect(page).toMatch(/Proposta em análise/i)
     expect(page).toMatch(/não é uma poupança confirmada/i)
   })

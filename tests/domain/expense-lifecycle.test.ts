@@ -154,17 +154,23 @@ describe('linha de vida da despesa', () => {
       proposedMonthlyCents: 3990,
       oneOffCents: 5000,
       commitmentMonths: 24,
-      currentPeriodCents: 117_360,
-      proposedPeriodCents: 100_760,
+      currentPeriodCents: 117360,
+      proposedPeriodCents: 100760,
       proposedMonthlyEquivalentCents: 4198,
-      periodDifferenceCents: 16_600,
+      recurringDifferenceCents: 900,
+      breakEvenMonth: 6,
+      periodDifferenceCents: 16600,
       outcome: 'lower',
       rule: 'Comparação condicional: assume o custo atual constante durante o período; não confirma poupança.'
     })
   })
 
-  it('assinala propostas mais caras e rejeita valores monetários inseguros', () => {
-    expect(compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 2100, oneOffCents: 0, commitmentMonths: 12 }).outcome).toBe('higher')
+  it('assinala propostas mais caras, não inventa ponto de equilíbrio e rejeita valores monetários inseguros', () => {
+    expect(compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 2100, oneOffCents: 0, commitmentMonths: 12 })).toMatchObject({
+      outcome: 'higher',
+      recurringDifferenceCents: -100,
+      breakEvenMonth: null
+    })
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: Number.MAX_SAFE_INTEGER, oneOffCents: 0, commitmentMonths: 12 })).toThrow(/Valor monetário inválido/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 0 })).toThrow(/Duração inválida/)
   })

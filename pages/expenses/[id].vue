@@ -109,6 +109,12 @@ const proposalOutcome = computed(() => {
   if (comparison.outcome === 'higher') return `A proposta custa mais ${money(Math.abs(comparison.periodDifferenceCents))} no período indicado.`
   return 'A proposta tem o mesmo custo total no período indicado.'
 })
+const proposalBreakEven = computed(() => {
+  const comparison = proposalComparison.value
+  if (!comparison || comparison.breakEvenMonth === null) return 'Sem ponto de equilíbrio: a mensalidade proposta não é inferior à atual.'
+  if (comparison.breakEvenMonth === 0) return 'Sem custos únicos por recuperar; a diferença mensal começa no 1.º mês.'
+  return `Custos únicos recuperados no ${comparison.breakEvenMonth}.º mês, se os valores não mudarem.`
+})
 const openValueEditor = () => {
   newMonthlyCost.value = data.value ? String(data.value.expense.monthlyCostCents / 100).replace('.', ',') : ''
   valueError.value = ''
@@ -515,8 +521,10 @@ const saveAgenda = async () => {
                     <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
                     <div><dt>Total no período</dt><dd>{{ money(proposalComparison.proposedPeriodCents) }}</dd></div>
                     <div><dt>Equivalente mensal da proposta</dt><dd>{{ money(proposalComparison.proposedMonthlyEquivalentCents) }}</dd></div>
+                    <div><dt>Diferença recorrente mensal</dt><dd>{{ money(proposalComparison.recurringDifferenceCents) }}</dd></div>
                   </dl>
                   <b>{{ proposalOutcome }}</b>
+                  <p><strong>Ponto de equilíbrio</strong> · {{ proposalBreakEven }}</p>
                   <small>{{ proposalComparison.rule }}</small>
                 </div>
               </form>
