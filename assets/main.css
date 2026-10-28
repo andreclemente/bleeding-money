@@ -315,6 +315,14 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .proposal-comparison__later-signal--warning { border-color: var(--bm-danger); background: var(--bm-danger-soft); color: var(--bm-ink) }
 .proposal-comparison__later-signal--positive { border-color: var(--bm-success); background: var(--bm-success-soft); color: var(--bm-ink) }
 .proposal-comparison__result>small { color: var(--bm-muted); font-size: .67rem; line-height: 1.4 }
+.proposal-next-action { display: grid; gap: 6px; margin-top: 4px; padding: 12px; border: 1px solid var(--bm-border-strong); background: var(--bm-surface) }
+.proposal-next-action>span { color: var(--bm-muted); font-size: .65rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase }
+.proposal-next-action>strong { font-size: .8rem }
+.proposal-next-action>p { margin: 0; color: var(--bm-ink-soft); font-size: .73rem; line-height: 1.45 }
+.proposal-next-action>small { color: var(--bm-muted); font-size: .65rem; line-height: 1.4 }
+.proposal-next-action--stop { border-color: var(--bm-danger); background: var(--bm-danger-soft) }
+.proposal-next-action--negotiate { border-color: var(--bm-warning); background: var(--bm-warning-soft) }
+.proposal-next-action--verify { border-color: var(--bm-success); background: var(--bm-success-soft) }
 .decision-dates dl { margin: 0 }
 .decision-dates dl>div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--bm-border) }
 .decision-dates dt { color: var(--bm-muted); font-size: .75rem }

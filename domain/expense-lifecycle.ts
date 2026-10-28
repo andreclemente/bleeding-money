@@ -75,6 +75,13 @@ export type ContractProposalComparison = {
   rule: string
 }
 
+export type ContractProposalDecision = {
+  tone: 'stop' | 'negotiate' | 'verify'
+  title: string
+  action: string
+  rule: string
+}
+
 const civilDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 const dayMs = 86_400_000
 
@@ -256,6 +263,53 @@ export const compareContractProposal = (input: {
     periodDifferenceCents,
     outcome: periodDifferenceCents > 0 ? 'lower' : periodDifferenceCents < 0 ? 'higher' : 'same',
     rule: 'Comparação condicional: assume o custo atual constante durante o período; não confirma poupança.'
+  }
+}
+
+const euros = (cents: number) => {
+  const absolute = Math.abs(cents)
+  return `${Math.floor(absolute / 100)},${String(absolute % 100).padStart(2, '0')}\u00a0€`
+}
+
+export const buildContractProposalDecision = (comparison: ContractProposalComparison): ContractProposalDecision => {
+  if (comparison.laterRecurringDifferenceCents !== undefined && comparison.laterRecurringDifferenceCents < 0) {
+    const exhaustion = typeof comparison.accumulatedAdvantageExhaustedMonth === 'number'
+      ? ` Com os valores declarados, a vantagem acumulada esgota-se no ${comparison.accumulatedAdvantageExhaustedMonth}.º mês.`
+      : ''
+    return {
+      tone: 'negotiate',
+      title: 'Negociar o preço depois da promoção',
+      action: `Pede que a mensalidade posterior não ultrapasse ${euros(comparison.currentMonthlyCents)}.${exhaustion}`,
+      rule: 'É um limite condicional para negociar, não uma poupança confirmada.'
+    }
+  }
+
+  if (comparison.outcome === 'higher') {
+    const action = comparison.maximumMonthlyCentsForNoIncrease === null
+      ? 'Pede a remoção do custo único ou condições diferentes; com os valores declarados, nem uma mensalidade de 0,00 € evita pagar mais.'
+      : `Pede uma mensalidade de ${euros(comparison.maximumMonthlyCentsForNoIncrease)} ou menos, mantendo os restantes valores declarados.`
+    return {
+      tone: 'stop',
+      title: 'Não aceitar nestas condições',
+      action,
+      rule: 'É uma contraproposta calculada, não uma poupança confirmada.'
+    }
+  }
+
+  if (comparison.outcome === 'same') {
+    return {
+      tone: 'negotiate',
+      title: 'Sem vantagem de custo',
+      action: 'Pede uma melhoria no preço ou nas condições antes de assumir uma nova fidelização.',
+      rule: 'O custo total declarado é igual; não existe poupança confirmada.'
+    }
+  }
+
+  return {
+    tone: 'verify',
+    title: 'Confirmar antes de decidir',
+    action: 'Pede por escrito o preço final, os serviços incluídos, os custos únicos e a data exata de fim da fidelização.',
+    rule: 'A comparação é favorável, mas só um novo custo aceite e observado confirma poupança.'
   }
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalDecision, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -97,6 +97,7 @@ const proposalIntroductoryMonths = ref('')
 const proposalLaterMonthlyCost = ref('')
 const proposalError = ref('')
 const proposalComparison = ref<ReturnType<typeof compareContractProposal> | null>(null)
+const proposalDecision = computed(() => proposalComparison.value ? buildContractProposalDecision(proposalComparison.value) : null)
 const compareProposal = () => {
   if (!data.value) return
   proposalError.value = ''
@@ -685,6 +686,16 @@ const saveAgenda = async () => {
                   <p><strong>Ponto de equilíbrio</strong> · {{ proposalBreakEven }}</p>
                   <p><strong>Limite para não pagar mais</strong> · {{ proposalPriceLimit }}</p>
                   <small>{{ proposalComparison.rule }}</small>
+                  <div
+                    v-if="proposalDecision"
+                    class="proposal-next-action"
+                    :class="`proposal-next-action--${proposalDecision.tone}`"
+                  >
+                    <span>Próxima ação para esta proposta</span>
+                    <strong>{{ proposalDecision.title }}</strong>
+                    <p>{{ proposalDecision.action }}</p>
+                    <small>{{ proposalDecision.rule }}</small>
+                  </div>
                 </div>
               </form>
               <dl v-if="lifecycle!.decisionDates.length">

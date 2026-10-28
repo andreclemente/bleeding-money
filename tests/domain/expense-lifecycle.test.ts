@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalDecision, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -301,6 +301,56 @@ describe('linha de vida da despesa', () => {
     })).toMatchObject({
       maximumMonthlyCentsForNoIncrease: null,
       outcome: 'higher'
+    })
+  })
+
+  it('transforma uma proposta mais cara numa única contraproposta verificável', () => {
+    const comparison = compareContractProposal({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 4690,
+      oneOffCents: 5000,
+      commitmentMonths: 12
+    })
+
+    expect(buildContractProposalDecision(comparison)).toEqual({
+      tone: 'stop',
+      title: 'Não aceitar nestas condições',
+      action: 'Pede uma mensalidade de 44,73 € ou menos, mantendo os restantes valores declarados.',
+      rule: 'É uma contraproposta calculada, não uma poupança confirmada.'
+    })
+  })
+
+  it('põe o preço posterior em primeiro lugar quando a promoção esconde um agravamento', () => {
+    const comparison = compareContractProposal({
+      currentMonthlyCents: 5000,
+      proposedMonthlyCents: 3000,
+      oneOffCents: 0,
+      commitmentMonths: 12,
+      introductoryMonths: 3,
+      laterMonthlyCents: 6000
+    })
+
+    expect(buildContractProposalDecision(comparison)).toEqual({
+      tone: 'negotiate',
+      title: 'Negociar o preço depois da promoção',
+      action: 'Pede que a mensalidade posterior não ultrapasse 50,00 €. Com os valores declarados, a vantagem acumulada esgota-se no 9.º mês.',
+      rule: 'É um limite condicional para negociar, não uma poupança confirmada.'
+    })
+  })
+
+  it('manda confirmar por escrito quando o custo total é inferior sem agravamento posterior', () => {
+    const comparison = compareContractProposal({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 3990,
+      oneOffCents: 0,
+      commitmentMonths: 24
+    })
+
+    expect(buildContractProposalDecision(comparison)).toEqual({
+      tone: 'verify',
+      title: 'Confirmar antes de decidir',
+      action: 'Pede por escrito o preço final, os serviços incluídos, os custos únicos e a data exata de fim da fidelização.',
+      rule: 'A comparação é favorável, mas só um novo custo aceite e observado confirma poupança.'
     })
   })
 

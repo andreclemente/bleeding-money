@@ -102,4 +102,14 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Proposta em análise/i)
     expect(page).toMatch(/não é uma poupança confirmada/i)
   })
+
+  it('fecha a comparação com uma única próxima ação condicional e verificável', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/buildContractProposalDecision/)
+    expect(page).toMatch(/Próxima ação para esta proposta/i)
+    expect(page).toMatch(/proposalDecision\.title/)
+    expect(page).toMatch(/proposalDecision\.action/)
+    expect(page).toMatch(/proposalDecision\.rule/)
+  })
 })
