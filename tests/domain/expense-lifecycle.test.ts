@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildContractProposalReadiness, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -371,6 +371,30 @@ describe('linha de vida da despesa', () => {
       'Próxima ação: Não aceitar nestas condições — Pede uma mensalidade de 44,73 € ou menos, mantendo os restantes valores declarados.',
       'Estado: proposta não aceite; não é uma poupança confirmada.'
     ].join('\n'))
+  })
+
+  it('bloqueia a comparação até confirmar preço final, âmbito e prazo da proposta', () => {
+    expect(buildContractProposalReadiness({
+      finalPriceConfirmed: true,
+      scopeCompared: false,
+      commitmentTermsConfirmed: false
+    })).toEqual({
+      ready: false,
+      missing: ['Serviços ou condições incluídos comparados', 'Fidelização, renovação e cancelamento confirmados'],
+      action: 'Compara os serviços ou condições incluídos com o contrato atual.',
+      rule: 'Sem estes factos, uma mensalidade isolada não permite uma comparação auditável.'
+    })
+
+    expect(buildContractProposalReadiness({
+      finalPriceConfirmed: true,
+      scopeCompared: true,
+      commitmentTermsConfirmed: true
+    })).toEqual({
+      ready: true,
+      missing: [],
+      action: 'Os factos essenciais da proposta foram confirmados; já podes comparar os custos declarados.',
+      rule: 'A comparação continua condicional e não confirma poupança.'
+    })
   })
 
   it('bloqueia a comparação monetária de seguros até a proposta ter condições comparáveis', () => {

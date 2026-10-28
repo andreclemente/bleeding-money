@@ -114,6 +114,18 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/não é uma poupança confirmada/i)
   })
 
+  it('exige factos essenciais da proposta antes de comparar os números', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/buildContractProposalReadiness/)
+    expect(page).toMatch(/Factos confirmados na proposta/i)
+    expect(page).toMatch(/Preço final com impostos, descontos e extras confirmado/i)
+    expect(page).toMatch(/Serviços ou condições incluídos comparados/i)
+    expect(page).toMatch(/Fidelização, renovação e cancelamento confirmados/i)
+    expect(page).toMatch(/Comparação bloqueada/i)
+    expect(page).toMatch(/proposalReadiness\.ready/)
+  })
+
   it('fecha a comparação com uma única próxima ação condicional e verificável', async () => {
     const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
 

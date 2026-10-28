@@ -89,6 +89,13 @@ export type InsuranceProposalReadiness = {
   rule: string
 }
 
+export type ContractProposalReadiness = {
+  ready: boolean
+  missing: string[]
+  action: string
+  rule: string
+}
+
 const civilDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 const dayMs = 86_400_000
 
@@ -177,6 +184,47 @@ export const buildContractCallGuide = (expense: RecurringExpense, decisionDates:
   questions: structuredClone(callQuestions[expense.category]),
   rule: 'Regista a resposta como proposta. Só um novo custo aceite e observado confirma poupança.'
 })
+
+export const buildContractProposalReadiness = (input: {
+  finalPriceConfirmed: boolean
+  scopeCompared: boolean
+  commitmentTermsConfirmed: boolean
+}): ContractProposalReadiness => {
+  const checks = [
+    {
+      confirmed: input.finalPriceConfirmed,
+      label: 'Preço final com impostos, descontos e extras confirmado',
+      action: 'Confirma o preço final com impostos, descontos e extras incluídos.'
+    },
+    {
+      confirmed: input.scopeCompared,
+      label: 'Serviços ou condições incluídos comparados',
+      action: 'Compara os serviços ou condições incluídos com o contrato atual.'
+    },
+    {
+      confirmed: input.commitmentTermsConfirmed,
+      label: 'Fidelização, renovação e cancelamento confirmados',
+      action: 'Confirma a fidelização, a renovação e as condições de cancelamento.'
+    }
+  ]
+  const missing = checks.filter(check => !check.confirmed)
+
+  if (missing.length) {
+    return {
+      ready: false,
+      missing: missing.map(check => check.label),
+      action: missing[0]!.action,
+      rule: 'Sem estes factos, uma mensalidade isolada não permite uma comparação auditável.'
+    }
+  }
+
+  return {
+    ready: true,
+    missing: [],
+    action: 'Os factos essenciais da proposta foram confirmados; já podes comparar os custos declarados.',
+    rule: 'A comparação continua condicional e não confirma poupança.'
+  }
+}
 
 export const buildInsuranceProposalReadiness = (input: {
   equivalentInsuredScope: boolean
