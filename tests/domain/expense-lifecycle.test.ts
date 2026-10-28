@@ -259,6 +259,23 @@ describe('linha de vida da despesa', () => {
     })
   })
 
+  it('inclui o custo confirmado de saída do contrato atual no esforço inicial e no custo total da mudança', () => {
+    expect(compareContractProposal({
+      currentMonthlyCents: 5000,
+      proposedMonthlyCents: 4000,
+      oneOffCents: 2000,
+      exitCostCents: 12_000,
+      commitmentMonths: 24
+    })).toMatchObject({
+      exitCostCents: 12_000,
+      firstMonthCents: 18_000,
+      firstMonthDifferenceCents: -13_000,
+      proposedPeriodCents: 110_000,
+      periodDifferenceCents: 10_000,
+      outcome: 'lower'
+    })
+  })
+
   it('expõe quando o preço posterior à promoção fica acima do contrato atual', () => {
     expect(compareContractProposal({
       currentMonthlyCents: 4890,
@@ -432,6 +449,7 @@ describe('linha de vida da despesa', () => {
       breakEvenMonth: null
     })
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: Number.MAX_SAFE_INTEGER, oneOffCents: 0, commitmentMonths: 12 })).toThrow(/Valor monetário inválido/)
+    expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, exitCostCents: -1, commitmentMonths: 12 })).toThrow(/Valor monetário inválido/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 0 })).toThrow(/Duração inválida/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 12, introductoryMonths: 3 })).toThrow(/preço posterior/i)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 12, introductoryMonths: 13, laterMonthlyCents: 2000 })).toThrow(/Duração promocional inválida/)

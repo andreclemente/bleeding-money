@@ -94,7 +94,7 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Custo anual depois da promoção/i)
     expect(page).toMatch(/por ano face ao custo atual declarado/i)
     expect(page).toMatch(/Custo nos primeiros/i)
-    expect(page).toMatch(/inclui o custo único/i)
+    expect(page).toMatch(/inclui custos únicos e saída/i)
     expect(page).toMatch(/face ao custo atual no mesmo período/i)
     expect(page).toMatch(/Custo no 1.º mês/i)
     expect(page).toMatch(/esforço inicial/i)
@@ -106,7 +106,7 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/não se esgota nos meses comparados/i)
     expect(page).toMatch(/Total no período/i)
     expect(page).toMatch(/Ponto de equilíbrio/i)
-    expect(page).toMatch(/Custos únicos recuperados/i)
+    expect(page).toMatch(/Custos iniciais recuperados/i)
     expect(page).toMatch(/Limite para não pagar mais/i)
     expect(page).toMatch(/mensalidade posterior máxima/i)
     expect(page).toMatch(/nem uma mensalidade de 0/i)
@@ -124,6 +124,15 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Fidelização, renovação e cancelamento confirmados/i)
     expect(page).toMatch(/Comparação bloqueada/i)
     expect(page).toMatch(/proposalReadiness\.ready/)
+  })
+
+  it('torna visível o custo confirmado de saída do contrato atual na comparação', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Custo para sair do contrato atual/i)
+    expect(page).toMatch(/exitCostCents/)
+    expect(page).toMatch(/Custo de saída confirmado/i)
+    expect(page).toMatch(/inclui custos únicos e saída/i)
   })
 
   it('fecha a comparação com uma única próxima ação condicional e verificável', async () => {

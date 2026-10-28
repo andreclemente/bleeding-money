@@ -91,6 +91,7 @@ const parseEuros = (value: string) => {
 }
 const proposalMonthlyCost = ref('')
 const proposalOneOffCost = ref('0')
+const proposalExitCost = ref('')
 const proposalCommitmentMonths = ref('12')
 const proposalHasLaterPrice = ref(false)
 const proposalIntroductoryMonths = ref('')
@@ -138,6 +139,7 @@ const compareProposal = () => {
       currentMonthlyCents: data.value.expense.monthlyCostCents,
       proposedMonthlyCents: parseEuros(proposalMonthlyCost.value),
       oneOffCents: parseEuros(proposalOneOffCost.value),
+      exitCostCents: parseEuros(proposalExitCost.value),
       commitmentMonths: Number(proposalCommitmentMonths.value),
       ...(proposalHasLaterPrice.value ? {
         introductoryMonths: Number(proposalIntroductoryMonths.value),
@@ -170,14 +172,14 @@ const proposalBreakEven = computed(() => {
   const comparison = proposalComparison.value
   if (!comparison) return ''
   if (comparison.breakEvenMonth === null) return `Não é atingido dentro dos ${comparison.commitmentMonths} meses comparados.`
-  if (comparison.breakEvenMonth === 0) return 'Sem custos únicos por recuperar; a diferença mensal começa no 1.º mês.'
-  return `Custos únicos recuperados no ${comparison.breakEvenMonth}.º mês, se os valores não mudarem.`
+  if (comparison.breakEvenMonth === 0) return 'Sem custos iniciais por recuperar; a diferença mensal começa no 1.º mês.'
+  return `Custos iniciais recuperados no ${comparison.breakEvenMonth}.º mês, se os valores não mudarem.`
 })
 const proposalPriceLimit = computed(() => {
   const comparison = proposalComparison.value
   if (!comparison) return ''
   if (comparison.maximumMonthlyCentsForNoIncrease === null) {
-    return 'Os custos únicos são tão altos que nem uma mensalidade de 0 € evita pagar mais no período indicado.'
+    return 'Os custos iniciais são tão altos que nem uma mensalidade de 0 € evita pagar mais no período indicado.'
   }
   const label = comparison.introductoryMonths === undefined ? 'mensalidade máxima' : 'mensalidade posterior máxima'
   return `${label}: ${money(comparison.maximumMonthlyCentsForNoIncrease)}. Acima deste valor, a proposta passa a custar mais no período indicado.`
@@ -200,7 +202,7 @@ const proposalAccumulatedAdvantageSignal = computed(() => {
   if (!comparison || comparison.laterRecurringDifferenceCents === undefined || comparison.laterRecurringDifferenceCents >= 0) return null
   if ((comparison.accumulatedAdvantageAtPromotionEndCents ?? 0) <= 0) return {
     tone: 'warning',
-    text: 'O preço inicial não cria uma vantagem acumulada até ao fim da promoção, depois de incluir o custo único.'
+    text: 'O preço inicial não cria uma vantagem acumulada até ao fim da promoção, depois de incluir custos únicos e saída.'
   }
   if (typeof comparison.accumulatedAdvantageExhaustedMonth === 'number') return {
     tone: 'warning',
@@ -732,6 +734,17 @@ const saveAgenda = async () => {
                     autocomplete="off"
                   ><span>EUR</span>
                 </div>
+                <label for="proposal-exit-cost">Custo para sair do contrato atual</label>
+                <div class="money-input">
+                  <input
+                    id="proposal-exit-cost"
+                    v-model="proposalExitCost"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    placeholder="0,00"
+                  ><span>EUR</span>
+                </div>
+                <small>Indica 0 apenas se confirmaste que não existe penalização ou valor pendente.</small>
                 <label for="proposal-commitment-months">Período comparado</label>
                 <div class="proposal-comparison__months">
                   <input
@@ -764,7 +777,8 @@ const saveAgenda = async () => {
                   <strong>Proposta em análise</strong>
                   <dl>
                     <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
-                    <div><dt>Custo no 1.º mês</dt><dd>{{ money(proposalComparison.firstMonthCents) }} · inclui o custo único</dd></div>
+                    <div><dt>Custo de saída confirmado</dt><dd>{{ money(proposalComparison.exitCostCents || 0) }}</dd></div>
+                    <div><dt>Custo no 1.º mês</dt><dd>{{ money(proposalComparison.firstMonthCents) }} · inclui custos únicos e saída</dd></div>
                     <div v-if="proposalComparison.introductoryMonths">
                       <dt>Preço inicial</dt><dd>{{ money(proposalComparison.proposedMonthlyCents) }} × {{ proposalComparison.introductoryMonths }} meses</dd>
                     </div>
@@ -775,7 +789,7 @@ const saveAgenda = async () => {
                       <dt>Custo anual depois da promoção</dt><dd>{{ money(proposalComparison.laterAnnualCents) }} · {{ proposalLaterAnnualDifference }}</dd>
                     </div>
                     <div>
-                      <dt>Custo nos primeiros {{ proposalComparison.firstPeriodMonths }} meses</dt><dd>{{ money(proposalComparison.firstPeriodCents) }} · inclui o custo único · {{ proposalFirstPeriodDifference }}</dd>
+                      <dt>Custo nos primeiros {{ proposalComparison.firstPeriodMonths }} meses</dt><dd>{{ money(proposalComparison.firstPeriodCents) }} · inclui custos únicos e saída · {{ proposalFirstPeriodDifference }}</dd>
                     </div>
                     <div><dt>Total no período</dt><dd>{{ money(proposalComparison.proposedPeriodCents) }}</dd></div>
                     <div><dt>Equivalente mensal da proposta</dt><dd>{{ money(proposalComparison.proposedMonthlyEquivalentCents) }}</dd></div>

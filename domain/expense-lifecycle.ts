@@ -50,6 +50,7 @@ export type ContractProposalComparison = {
   currentMonthlyCents: number
   proposedMonthlyCents: number
   oneOffCents: number
+  exitCostCents?: number
   commitmentMonths: number
   currentPeriodCents: number
   proposedPeriodCents: number
@@ -271,11 +272,12 @@ export const compareContractProposal = (input: {
   currentMonthlyCents: number
   proposedMonthlyCents: number
   oneOffCents: number
+  exitCostCents?: number
   commitmentMonths: number
   introductoryMonths?: number
   laterMonthlyCents?: number
 }): ContractProposalComparison => {
-  for (const value of [input.currentMonthlyCents, input.proposedMonthlyCents, input.oneOffCents, input.laterMonthlyCents].filter(value => value !== undefined)) {
+  for (const value of [input.currentMonthlyCents, input.proposedMonthlyCents, input.oneOffCents, input.exitCostCents, input.laterMonthlyCents].filter(value => value !== undefined)) {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('Valor monetário inválido.')
   }
   if (!Number.isSafeInteger(input.commitmentMonths) || input.commitmentMonths < 1 || input.commitmentMonths > 120) throw new Error('Duração inválida.')
@@ -287,13 +289,16 @@ export const compareContractProposal = (input: {
   }
 
   const currentPeriodCents = input.currentMonthlyCents * input.commitmentMonths
+  const exitCostCents = input.exitCostCents ?? 0
+  const upfrontCostCents = input.oneOffCents + exitCostCents
+  if (!Number.isSafeInteger(upfrontCostCents)) throw new Error('Valor monetário inválido.')
   const laterPeriodMonths = hasPhasedPrice ? input.commitmentMonths - input.introductoryMonths! : 0
   const proposedRecurringPeriodCents = hasPhasedPrice
     ? input.proposedMonthlyCents * input.introductoryMonths! + input.laterMonthlyCents! * laterPeriodMonths
     : input.proposedMonthlyCents * input.commitmentMonths
-  const proposedPeriodCents = proposedRecurringPeriodCents + input.oneOffCents
+  const proposedPeriodCents = proposedRecurringPeriodCents + upfrontCostCents
   if (!Number.isSafeInteger(currentPeriodCents) || !Number.isSafeInteger(proposedPeriodCents)) throw new Error('Valor monetário inválido.')
-  const firstMonthCents = input.proposedMonthlyCents + input.oneOffCents
+  const firstMonthCents = input.proposedMonthlyCents + upfrontCostCents
   const firstMonthDifferenceCents = input.currentMonthlyCents - firstMonthCents
   if (!Number.isSafeInteger(firstMonthCents) || !Number.isSafeInteger(firstMonthDifferenceCents)) throw new Error('Valor monetário inválido.')
   const recurringDifferenceCents = input.currentMonthlyCents - input.proposedMonthlyCents
@@ -306,33 +311,33 @@ export const compareContractProposal = (input: {
     throw new Error('Valor monetário inválido.')
   }
   const accumulatedAdvantageAtPromotionEndCents = hasPhasedPrice
-    ? (input.currentMonthlyCents - input.proposedMonthlyCents) * input.introductoryMonths! - input.oneOffCents
+    ? (input.currentMonthlyCents - input.proposedMonthlyCents) * input.introductoryMonths! - upfrontCostCents
     : undefined
   if (accumulatedAdvantageAtPromotionEndCents !== undefined && !Number.isSafeInteger(accumulatedAdvantageAtPromotionEndCents)) throw new Error('Valor monetário inválido.')
   const firstPeriodMonths = Math.min(12, input.commitmentMonths)
   const firstIntroductoryMonths = hasPhasedPrice ? Math.min(input.introductoryMonths!, firstPeriodMonths) : firstPeriodMonths
   const firstLaterMonths = firstPeriodMonths - firstIntroductoryMonths
-  const firstPeriodCents = input.oneOffCents
+  const firstPeriodCents = upfrontCostCents
     + input.proposedMonthlyCents * firstIntroductoryMonths
     + (hasPhasedPrice ? input.laterMonthlyCents! * firstLaterMonths : 0)
   const firstPeriodDifferenceCents = input.currentMonthlyCents * firstPeriodMonths - firstPeriodCents
   if (!Number.isSafeInteger(firstPeriodCents) || !Number.isSafeInteger(firstPeriodDifferenceCents)) throw new Error('Valor monetário inválido.')
   const priceLimitAvailableCents = hasPhasedPrice
-    ? currentPeriodCents - input.oneOffCents - input.proposedMonthlyCents * input.introductoryMonths!
-    : currentPeriodCents - input.oneOffCents
+    ? currentPeriodCents - upfrontCostCents - input.proposedMonthlyCents * input.introductoryMonths!
+    : currentPeriodCents - upfrontCostCents
   if (!Number.isSafeInteger(priceLimitAvailableCents)) throw new Error('Valor monetário inválido.')
   const priceLimitMonths = hasPhasedPrice ? laterPeriodMonths : input.commitmentMonths
   const maximumMonthlyCentsForNoIncrease = priceLimitAvailableCents < 0
     ? null
     : Math.floor(priceLimitAvailableCents / priceLimitMonths)
   const periodDifferenceCents = currentPeriodCents - proposedPeriodCents
-  let breakEvenMonth: number | null = input.oneOffCents === 0 && input.proposedMonthlyCents < input.currentMonthlyCents ? 0 : null
+  let breakEvenMonth: number | null = upfrontCostCents === 0 && input.proposedMonthlyCents < input.currentMonthlyCents ? 0 : null
   let accumulatedAdvantageExhaustedMonth: number | null = null
-  let accumulatedDifferenceCents = -input.oneOffCents
+  let accumulatedDifferenceCents = -upfrontCostCents
   for (let month = 1; breakEvenMonth === null && month <= input.commitmentMonths; month += 1) {
     const proposedMonthlyCents = hasPhasedPrice && month > input.introductoryMonths! ? input.laterMonthlyCents! : input.proposedMonthlyCents
     accumulatedDifferenceCents += input.currentMonthlyCents - proposedMonthlyCents
-    if (accumulatedDifferenceCents >= 0 && (input.oneOffCents > 0 || accumulatedDifferenceCents > 0)) breakEvenMonth = month
+    if (accumulatedDifferenceCents >= 0 && (upfrontCostCents > 0 || accumulatedDifferenceCents > 0)) breakEvenMonth = month
   }
   if (hasPhasedPrice && laterRecurringDifferenceCents! < 0 && accumulatedAdvantageAtPromotionEndCents! > 0) {
     accumulatedDifferenceCents = accumulatedAdvantageAtPromotionEndCents!
@@ -422,6 +427,7 @@ export const buildContractProposalActionNote = (comparison: ContractProposalComp
     'Proposta em análise',
     ...priceLines,
     `Custo único declarado: ${euros(comparison.oneOffCents)}`,
+    ...(comparison.exitCostCents !== undefined ? [`Custo de saída confirmado: ${euros(comparison.exitCostCents)}`] : []),
     `Período comparado: ${comparison.commitmentMonths} meses`,
     `Custo total declarado: ${euros(comparison.proposedPeriodCents)}`,
     `Próxima ação: ${decision.title} — ${decision.action}`,
