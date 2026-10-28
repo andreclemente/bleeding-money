@@ -458,7 +458,8 @@ describe('linha de vida da despesa', () => {
       finalPriceConfirmed: true,
       scopeCompared: false,
       commitmentTermsConfirmed: false,
-      upfrontCostsConfirmed: true
+      upfrontCostsConfirmed: true,
+      pricePathConfirmed: true
     })).toEqual({
       ready: false,
       missing: ['Serviços ou condições incluídos comparados', 'Fidelização, renovação e cancelamento confirmados'],
@@ -470,7 +471,8 @@ describe('linha de vida da despesa', () => {
       finalPriceConfirmed: true,
       scopeCompared: true,
       commitmentTermsConfirmed: true,
-      upfrontCostsConfirmed: true
+      upfrontCostsConfirmed: true,
+      pricePathConfirmed: true
     })).toEqual({
       ready: true,
       missing: [],
@@ -482,13 +484,37 @@ describe('linha de vida da despesa', () => {
       finalPriceConfirmed: true,
       scopeCompared: true,
       commitmentTermsConfirmed: true,
-      upfrontCostsConfirmed: false
+      upfrontCostsConfirmed: false,
+      pricePathConfirmed: true
     })).toEqual({
       ready: false,
       missing: ['Custos únicos e custo de saída confirmados'],
       action: 'Confirma os custos únicos da proposta e o custo para sair do contrato atual, mesmo quando sejam zero.',
       rule: 'Sem estes factos, uma mensalidade isolada não permite uma comparação auditável.'
     })
+  })
+
+  it('não assume que o preço fica estável durante todo o período comparado', () => {
+    expect(buildContractProposalReadiness({
+      finalPriceConfirmed: true,
+      scopeCompared: true,
+      commitmentTermsConfirmed: true,
+      upfrontCostsConfirmed: true,
+      pricePathConfirmed: false
+    })).toEqual({
+      ready: false,
+      missing: ['Preço e alterações durante o período comparado confirmados'],
+      action: 'Confirma se o preço se mantém ou regista a alteração prevista durante o período comparado.',
+      rule: 'Sem estes factos, uma mensalidade isolada não permite uma comparação auditável.'
+    })
+
+    expect(buildContractProposalReadiness({
+      finalPriceConfirmed: true,
+      scopeCompared: true,
+      commitmentTermsConfirmed: true,
+      upfrontCostsConfirmed: true,
+      pricePathConfirmed: true
+    }).ready).toBe(true)
   })
 
   it('bloqueia a comparação monetária de seguros até a proposta ter condições comparáveis', () => {

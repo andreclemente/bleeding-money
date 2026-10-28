@@ -102,11 +102,13 @@ const proposalFinalPriceConfirmed = ref(false)
 const proposalScopeCompared = ref(false)
 const proposalCommitmentTermsConfirmed = ref(false)
 const proposalUpfrontCostsConfirmed = ref(false)
+const proposalPricePathConfirmed = ref(false)
 const proposalReadiness = computed(() => buildContractProposalReadiness({
   finalPriceConfirmed: proposalFinalPriceConfirmed.value,
   scopeCompared: proposalScopeCompared.value,
   commitmentTermsConfirmed: proposalCommitmentTermsConfirmed.value,
-  upfrontCostsConfirmed: proposalUpfrontCostsConfirmed.value
+  upfrontCostsConfirmed: proposalUpfrontCostsConfirmed.value,
+  pricePathConfirmed: proposalPricePathConfirmed.value
 }))
 const proposalValidity = computed(() => buildContractProposalValidity({
   validUntil: proposalValidUntil.value,
@@ -165,6 +167,7 @@ watch([
   proposalScopeCompared,
   proposalCommitmentTermsConfirmed,
   proposalUpfrontCostsConfirmed,
+  proposalPricePathConfirmed,
   proposalValidUntil,
   proposalValidityUndeclared,
   proposalEquivalentInsuredScope,
@@ -660,6 +663,14 @@ const saveAgenda = async () => {
                     <span>Custos únicos e custo de saída confirmados</span>
                   </label>
                   <small>Confirma os dois valores no documento ou junto do fornecedor, mesmo quando sejam zero.</small>
+                  <label>
+                    <input
+                      v-model="proposalPricePathConfirmed"
+                      type="checkbox"
+                    >
+                    <span>Preço e alterações durante o período comparado confirmados</span>
+                  </label>
+                  <small>Confirma se o preço se mantém. Se existir uma alteração prevista, ativa-a abaixo e regista o preço posterior.</small>
                   <div
                     class="insurance-proposal-readiness__status"
                     :class="{ 'insurance-proposal-readiness__status--ready': proposalReadiness.ready }"
