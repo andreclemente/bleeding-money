@@ -300,7 +300,18 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .proposal-comparison>.proposal-comparison__toggle { display: flex; align-items: center; gap: 9px; margin: 3px 0; padding: 10px; border: 1px solid var(--bm-border); background: var(--bm-surface) }
 .proposal-comparison__toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--bm-accent) }
 .proposal-comparison__toggle span { line-height: 1.35 }
+.insurance-proposal-readiness { display: grid; gap: 8px; min-width: 0; margin: 4px 0; padding: 12px; border: 1px solid var(--bm-border-strong); background: var(--bm-surface) }
+.insurance-proposal-readiness legend { padding: 0 5px; color: var(--bm-ink); font-size: .75rem; font-weight: 800 }
+.insurance-proposal-readiness>p { margin: 0 0 2px; color: var(--bm-muted); font-size: .7rem; line-height: 1.45 }
+.insurance-proposal-readiness>label { display: flex; align-items: flex-start; gap: 9px; color: var(--bm-ink-soft); font-size: .72rem; font-weight: 700; line-height: 1.4 }
+.insurance-proposal-readiness>label input { width: 18px; height: 18px; flex: 0 0 auto; margin: 0; accent-color: var(--bm-accent) }
+.insurance-proposal-readiness__status { display: grid; gap: 4px; margin-top: 3px; padding: 10px; border-left: 3px solid var(--bm-warning); background: var(--bm-warning-soft) }
+.insurance-proposal-readiness__status--ready { border-color: var(--bm-success); background: var(--bm-success-soft) }
+.insurance-proposal-readiness__status strong { font-size: .72rem }
+.insurance-proposal-readiness__status p { margin: 0; color: var(--bm-ink-soft); font-size: .7rem; line-height: 1.4 }
+.insurance-proposal-readiness__status small { color: var(--bm-muted); font-size: .65rem; line-height: 1.4 }
 .proposal-comparison>.secondary-action { width: 100%; margin-top: 4px }
+.proposal-comparison>.secondary-action:disabled { cursor: not-allowed; opacity: .45 }
 .proposal-comparison__months { display: grid; grid-template-columns: 1fr auto; align-items: center; border: 1px solid var(--bm-border-strong); background: var(--bm-surface) }
 .proposal-comparison__months input { min-width: 0; min-height: 42px; padding: 0 12px; border: 0; color: var(--bm-ink); background: transparent }
 .proposal-comparison__months span { padding: 0 12px; color: var(--bm-muted); font-size: .72rem; font-weight: 700 }

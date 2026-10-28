@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -95,6 +95,14 @@ const proposalCommitmentMonths = ref('12')
 const proposalHasLaterPrice = ref(false)
 const proposalIntroductoryMonths = ref('')
 const proposalLaterMonthlyCost = ref('')
+const proposalEquivalentInsuredScope = ref(false)
+const proposalComparableCoverage = ref(false)
+const proposalComparableDeductibles = ref(false)
+const insuranceProposalReadiness = computed(() => buildInsuranceProposalReadiness({
+  equivalentInsuredScope: proposalEquivalentInsuredScope.value,
+  comparableCoverage: proposalComparableCoverage.value,
+  comparableDeductibles: proposalComparableDeductibles.value
+}))
 const proposalError = ref('')
 const proposalComparison = ref<ReturnType<typeof compareContractProposal> | null>(null)
 const proposalDecision = computed(() => proposalComparison.value ? buildContractProposalDecision(proposalComparison.value) : null)
@@ -114,6 +122,7 @@ const compareProposal = () => {
   proposalActionStatus.value = ''
   proposalComparison.value = null
   try {
+    if (insuranceDetails.value && !insuranceProposalReadiness.value.ready) throw new Error(insuranceProposalReadiness.value.action)
     if (!/^\d+$/.test(proposalCommitmentMonths.value.trim())) throw new Error('Indica a duração em meses inteiros.')
     if (proposalHasLaterPrice.value && !/^\d+$/.test(proposalIntroductoryMonths.value.trim())) throw new Error('Indica os meses ao preço inicial.')
     proposalComparison.value = compareContractProposal({
@@ -130,6 +139,11 @@ const compareProposal = () => {
     proposalError.value = (caught as Error).message
   }
 }
+watch([proposalEquivalentInsuredScope, proposalComparableCoverage, proposalComparableDeductibles], () => {
+  if (!insuranceDetails.value) return
+  proposalComparison.value = null
+  proposalActionStatus.value = ''
+})
 const proposalOutcome = computed(() => {
   const comparison = proposalComparison.value
   if (!comparison) return ''
@@ -574,6 +588,43 @@ const saveAgenda = async () => {
               >
                 <span>Comparar proposta recebida</span>
                 <p>Compara a proposta declarada com o cenário em que o custo atual não muda. A proposta fica em análise: não é aceite, não altera o contrato e não é uma poupança confirmada.</p>
+                <fieldset
+                  v-if="insuranceDetails"
+                  class="insurance-proposal-readiness"
+                >
+                  <legend>Proposta de seguro comparável</legend>
+                  <p>Confirma apenas o que verificaste nos dois documentos. Sem equivalência suficiente, o preço isolado não prova uma oportunidade.</p>
+                  <label>
+                    <input
+                      v-model="proposalEquivalentInsuredScope"
+                      type="checkbox"
+                    >
+                    <span>Capitais e pessoas ou bens cobertos equivalentes</span>
+                  </label>
+                  <label>
+                    <input
+                      v-model="proposalComparableCoverage"
+                      type="checkbox"
+                    >
+                    <span>Coberturas e exclusões comparadas</span>
+                  </label>
+                  <label>
+                    <input
+                      v-model="proposalComparableDeductibles"
+                      type="checkbox"
+                    >
+                    <span>Franquias e condições de pagamento comparadas</span>
+                  </label>
+                  <div
+                    class="insurance-proposal-readiness__status"
+                    :class="{ 'insurance-proposal-readiness__status--ready': insuranceProposalReadiness.ready }"
+                    role="status"
+                  >
+                    <strong>{{ insuranceProposalReadiness.ready ? 'Condições essenciais confirmadas' : 'Comparação monetária bloqueada' }}</strong>
+                    <p>{{ insuranceProposalReadiness.action }}</p>
+                    <small>{{ insuranceProposalReadiness.rule }}</small>
+                  </div>
+                </fieldset>
                 <label for="proposal-monthly-cost">Mensalidade proposta</label>
                 <div class="money-input">
                   <input
@@ -634,6 +685,7 @@ const saveAgenda = async () => {
                 <button
                   class="secondary-action"
                   type="submit"
+                  :disabled="Boolean(insuranceDetails) && !insuranceProposalReadiness.ready"
                 >
                   Comparar custo total
                 </button>

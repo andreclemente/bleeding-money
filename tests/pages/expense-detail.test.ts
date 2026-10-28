@@ -121,4 +121,16 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/proposalActionStatus/)
     expect(page).toMatch(/navigator\.clipboard\.writeText/)
   })
+
+  it('não calcula uma diferença de seguro antes de confirmar condições comparáveis', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/buildInsuranceProposalReadiness/)
+    expect(page).toMatch(/Proposta de seguro comparável/i)
+    expect(page).toMatch(/Capitais e pessoas ou bens cobertos equivalentes/i)
+    expect(page).toMatch(/Coberturas e exclusões comparadas/i)
+    expect(page).toMatch(/Franquias e condições de pagamento comparadas/i)
+    expect(page).toMatch(/Comparação monetária bloqueada/i)
+    expect(page).toMatch(/insuranceProposalReadiness\.ready/)
+  })
 })

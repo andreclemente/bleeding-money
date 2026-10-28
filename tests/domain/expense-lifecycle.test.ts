@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -371,6 +371,30 @@ describe('linha de vida da despesa', () => {
       'Próxima ação: Não aceitar nestas condições — Pede uma mensalidade de 44,73 € ou menos, mantendo os restantes valores declarados.',
       'Estado: proposta não aceite; não é uma poupança confirmada.'
     ].join('\n'))
+  })
+
+  it('bloqueia a comparação monetária de seguros até a proposta ter condições comparáveis', () => {
+    expect(buildInsuranceProposalReadiness({
+      equivalentInsuredScope: true,
+      comparableCoverage: false,
+      comparableDeductibles: false
+    })).toEqual({
+      ready: false,
+      missing: ['Coberturas e exclusões comparadas', 'Franquias e condições de pagamento comparadas'],
+      action: 'Compara as coberturas e exclusões da proposta com o contrato atual.',
+      rule: 'Sem condições suficientemente equivalentes, não calculamos uma possível diferença de custo.'
+    })
+
+    expect(buildInsuranceProposalReadiness({
+      equivalentInsuredScope: true,
+      comparableCoverage: true,
+      comparableDeductibles: true
+    })).toEqual({
+      ready: true,
+      missing: [],
+      action: 'As condições essenciais foram declaradas como comparáveis; já podes comparar os custos.',
+      rule: 'A comparação continua condicional e não confirma poupança.'
+    })
   })
 
   it('assinala propostas mais caras, não inventa ponto de equilíbrio e rejeita valores monetários inseguros', () => {

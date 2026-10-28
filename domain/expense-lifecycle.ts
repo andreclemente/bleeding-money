@@ -82,6 +82,13 @@ export type ContractProposalDecision = {
   rule: string
 }
 
+export type InsuranceProposalReadiness = {
+  ready: boolean
+  missing: string[]
+  action: string
+  rule: string
+}
+
 const civilDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 const dayMs = 86_400_000
 
@@ -170,6 +177,47 @@ export const buildContractCallGuide = (expense: RecurringExpense, decisionDates:
   questions: structuredClone(callQuestions[expense.category]),
   rule: 'Regista a resposta como proposta. Só um novo custo aceite e observado confirma poupança.'
 })
+
+export const buildInsuranceProposalReadiness = (input: {
+  equivalentInsuredScope: boolean
+  comparableCoverage: boolean
+  comparableDeductibles: boolean
+}): InsuranceProposalReadiness => {
+  const checks = [
+    {
+      confirmed: input.equivalentInsuredScope,
+      label: 'Capitais e pessoas ou bens cobertos equivalentes',
+      action: 'Confirma que os capitais e as pessoas ou bens cobertos são equivalentes.'
+    },
+    {
+      confirmed: input.comparableCoverage,
+      label: 'Coberturas e exclusões comparadas',
+      action: 'Compara as coberturas e exclusões da proposta com o contrato atual.'
+    },
+    {
+      confirmed: input.comparableDeductibles,
+      label: 'Franquias e condições de pagamento comparadas',
+      action: 'Compara as franquias e as condições de pagamento da proposta.'
+    }
+  ]
+  const missing = checks.filter(check => !check.confirmed)
+
+  if (missing.length) {
+    return {
+      ready: false,
+      missing: missing.map(check => check.label),
+      action: missing[0]!.action,
+      rule: 'Sem condições suficientemente equivalentes, não calculamos uma possível diferença de custo.'
+    }
+  }
+
+  return {
+    ready: true,
+    missing: [],
+    action: 'As condições essenciais foram declaradas como comparáveis; já podes comparar os custos.',
+    rule: 'A comparação continua condicional e não confirma poupança.'
+  }
+}
 
 export const compareContractProposal = (input: {
   currentMonthlyCents: number
