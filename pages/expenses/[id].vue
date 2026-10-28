@@ -95,20 +95,19 @@ const proposalExitCost = ref('')
 const proposalValidUntil = ref('')
 const proposalValidityUndeclared = ref(false)
 const proposalCommitmentMonths = ref('12')
-const proposalHasLaterPrice = ref(false)
+const proposalPricePath = ref<'stable' | 'changes' | null>(null)
 const proposalIntroductoryMonths = ref('')
 const proposalLaterMonthlyCost = ref('')
 const proposalFinalPriceConfirmed = ref(false)
 const proposalScopeCompared = ref(false)
 const proposalCommitmentTermsConfirmed = ref(false)
 const proposalUpfrontCostsConfirmed = ref(false)
-const proposalPricePathConfirmed = ref(false)
 const proposalReadiness = computed(() => buildContractProposalReadiness({
   finalPriceConfirmed: proposalFinalPriceConfirmed.value,
   scopeCompared: proposalScopeCompared.value,
   commitmentTermsConfirmed: proposalCommitmentTermsConfirmed.value,
   upfrontCostsConfirmed: proposalUpfrontCostsConfirmed.value,
-  pricePathConfirmed: proposalPricePathConfirmed.value
+  pricePath: proposalPricePath.value
 }))
 const proposalValidity = computed(() => buildContractProposalValidity({
   validUntil: proposalValidUntil.value,
@@ -146,14 +145,14 @@ const compareProposal = () => {
     if (!proposalValidity.value.ready) throw new Error(proposalValidity.value.action)
     if (insuranceDetails.value && !insuranceProposalReadiness.value.ready) throw new Error(insuranceProposalReadiness.value.action)
     if (!/^\d+$/.test(proposalCommitmentMonths.value.trim())) throw new Error('Indica a duração em meses inteiros.')
-    if (proposalHasLaterPrice.value && !/^\d+$/.test(proposalIntroductoryMonths.value.trim())) throw new Error('Indica os meses ao preço inicial.')
+    if (proposalPricePath.value === 'changes' && !/^\d+$/.test(proposalIntroductoryMonths.value.trim())) throw new Error('Indica os meses ao preço inicial.')
     proposalComparison.value = compareContractProposal({
       currentMonthlyCents: data.value.expense.monthlyCostCents,
       proposedMonthlyCents: parseEuros(proposalMonthlyCost.value),
       oneOffCents: parseEuros(proposalOneOffCost.value),
       exitCostCents: parseEuros(proposalExitCost.value),
       commitmentMonths: Number(proposalCommitmentMonths.value),
-      ...(proposalHasLaterPrice.value ? {
+      ...(proposalPricePath.value === 'changes' ? {
         introductoryMonths: Number(proposalIntroductoryMonths.value),
         laterMonthlyCents: parseEuros(proposalLaterMonthlyCost.value)
       } : {})
@@ -167,7 +166,7 @@ watch([
   proposalScopeCompared,
   proposalCommitmentTermsConfirmed,
   proposalUpfrontCostsConfirmed,
-  proposalPricePathConfirmed,
+  proposalPricePath,
   proposalValidUntil,
   proposalValidityUndeclared,
   proposalEquivalentInsuredScope,
@@ -663,14 +662,29 @@ const saveAgenda = async () => {
                     <span>Custos únicos e custo de saída confirmados</span>
                   </label>
                   <small>Confirma os dois valores no documento ou junto do fornecedor, mesmo quando sejam zero.</small>
-                  <label>
-                    <input
-                      v-model="proposalPricePathConfirmed"
-                      type="checkbox"
-                    >
-                    <span>Preço e alterações durante o período comparado confirmados</span>
-                  </label>
-                  <small>Confirma se o preço se mantém. Se existir uma alteração prevista, ativa-a abaixo e regista o preço posterior.</small>
+                  <div class="proposal-price-path">
+                    <strong>Trajetória do preço durante o período comparado</strong>
+                    <p>Escolhe apenas o que confirmaste na proposta escrita.</p>
+                    <label>
+                      <input
+                        v-model="proposalPricePath"
+                        type="radio"
+                        name="proposal-price-path"
+                        value="stable"
+                      >
+                      <span>Mantém-se durante todo o período</span>
+                    </label>
+                    <label>
+                      <input
+                        v-model="proposalPricePath"
+                        type="radio"
+                        name="proposal-price-path"
+                        value="changes"
+                      >
+                      <span>Muda durante o período</span>
+                    </label>
+                    <small>Se mudar, regista abaixo quantos meses dura o preço inicial e qual é o preço posterior.</small>
+                  </div>
                   <div
                     class="insurance-proposal-readiness__status"
                     :class="{ 'insurance-proposal-readiness__status--ready': proposalReadiness.ready }"
@@ -756,14 +770,7 @@ const saveAgenda = async () => {
                     :aria-invalid="Boolean(proposalError)"
                   ><span>EUR</span>
                 </div>
-                <label class="proposal-comparison__toggle">
-                  <input
-                    v-model="proposalHasLaterPrice"
-                    type="checkbox"
-                  >
-                  <span>O preço aumenta durante a fidelização</span>
-                </label>
-                <template v-if="proposalHasLaterPrice">
+                <template v-if="proposalPricePath === 'changes'">
                   <label for="proposal-introductory-months">Meses ao preço inicial</label>
                   <div class="proposal-comparison__months">
                     <input

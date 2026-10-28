@@ -206,7 +206,7 @@ export const buildContractProposalReadiness = (input: {
   scopeCompared: boolean
   commitmentTermsConfirmed: boolean
   upfrontCostsConfirmed: boolean
-  pricePathConfirmed: boolean
+  pricePath: 'stable' | 'changes' | null
 }): ContractProposalReadiness => {
   const checks = [
     {
@@ -230,9 +230,9 @@ export const buildContractProposalReadiness = (input: {
       action: 'Confirma os custos únicos da proposta e o custo para sair do contrato atual, mesmo quando sejam zero.'
     },
     {
-      confirmed: input.pricePathConfirmed,
-      label: 'Preço e alterações durante o período comparado confirmados',
-      action: 'Confirma se o preço se mantém ou regista a alteração prevista durante o período comparado.'
+      confirmed: input.pricePath !== null,
+      label: 'Trajetória do preço durante o período comparado declarada',
+      action: 'Declara se o preço se mantém durante todo o período ou se muda numa data prevista.'
     }
   ]
   const missing = checks.filter(check => !check.confirmed)
