@@ -453,11 +453,12 @@ describe('linha de vida da despesa', () => {
     })
   })
 
-  it('bloqueia a comparação até confirmar preço final, âmbito e prazo da proposta', () => {
+  it('bloqueia a comparação até confirmar preço final, âmbito, prazo e custos iniciais da proposta', () => {
     expect(buildContractProposalReadiness({
       finalPriceConfirmed: true,
       scopeCompared: false,
-      commitmentTermsConfirmed: false
+      commitmentTermsConfirmed: false,
+      upfrontCostsConfirmed: true
     })).toEqual({
       ready: false,
       missing: ['Serviços ou condições incluídos comparados', 'Fidelização, renovação e cancelamento confirmados'],
@@ -468,12 +469,25 @@ describe('linha de vida da despesa', () => {
     expect(buildContractProposalReadiness({
       finalPriceConfirmed: true,
       scopeCompared: true,
-      commitmentTermsConfirmed: true
+      commitmentTermsConfirmed: true,
+      upfrontCostsConfirmed: true
     })).toEqual({
       ready: true,
       missing: [],
       action: 'Os factos essenciais da proposta foram confirmados; já podes comparar os custos declarados.',
       rule: 'A comparação continua condicional e não confirma poupança.'
+    })
+
+    expect(buildContractProposalReadiness({
+      finalPriceConfirmed: true,
+      scopeCompared: true,
+      commitmentTermsConfirmed: true,
+      upfrontCostsConfirmed: false
+    })).toEqual({
+      ready: false,
+      missing: ['Custos únicos e custo de saída confirmados'],
+      action: 'Confirma os custos únicos da proposta e o custo para sair do contrato atual, mesmo quando sejam zero.',
+      rule: 'Sem estes factos, uma mensalidade isolada não permite uma comparação auditável.'
     })
   })
 

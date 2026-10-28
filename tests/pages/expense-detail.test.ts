@@ -122,6 +122,8 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Preço final com impostos, descontos e extras confirmado/i)
     expect(page).toMatch(/Serviços ou condições incluídos comparados/i)
     expect(page).toMatch(/Fidelização, renovação e cancelamento confirmados/i)
+    expect(page).toMatch(/Custos únicos e custo de saída confirmados/i)
+    expect(page).toMatch(/mesmo quando sejam zero/i)
     expect(page).toMatch(/Comparação bloqueada/i)
     expect(page).toMatch(/proposalReadiness\.ready/)
   })
