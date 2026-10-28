@@ -192,6 +192,33 @@ describe('Rota Familiar', () => {
     expect(buildFamilyRoute({ ...base, findings: [] }).nextAction).toMatchObject({ kind: 'contract_deadline', eventKind: 'renewal', daysUntil: 45 })
   })
 
+  it('leva uma agenda contratual incompleta para Hoje antes de um plano condicional', () => {
+    const stale = expense('stale-agenda', {
+      productName: 'Fibra antiga',
+      commitmentEndDate: '2026-08-31'
+    })
+    const missing = expense('missing-agenda', { productName: 'Cloud' })
+    const latest = period('2026-09-01', [amount('target', 'period-2026-09-01', { trackingIntent: 'reduce', userTargetCents: 45000 })])
+
+    const route = buildFamilyRoute({
+      civilDate: '2026-09-09',
+      expenses: [missing, stale],
+      findings: [],
+      actions: [],
+      periods: [latest],
+      goal: null
+    })
+
+    expect(route.nextAction).toEqual({
+      kind: 'complete_contract_agenda',
+      expenseId: 'stale-agenda',
+      status: 'stale',
+      label: 'Prazo passado por confirmar',
+      action: 'Confirma se o contrato renovou e regista a próxima data real.',
+      lastDeclaredDate: '2026-08-31'
+    })
+  })
+
   it('propõe ligar reduções confirmadas a um objetivo ainda por definir', () => {
     const actions: SavingAction[] = [{ id: 'action-1', findingId: 'resolved', previousCostCents: 4599, newCostCents: 3599, actionDate: '2026-09-02', annualSavingCents: 12000, createdAt: '2026-09-02T00:00:00.000Z' }]
 
@@ -225,8 +252,8 @@ describe('Rota Familiar', () => {
 
     expect(buildFamilyRoute({ ...base, findings: [factual], periods: [latest] }).nextAction.kind).toBe('factual_finding')
     expect(buildFamilyRoute({ ...base, findings: [], periods: [latest, comparableOne, comparableTwo, mismatched] }).nextAction).toMatchObject({ kind: 'build_own_history', recordedMonths: 2, missingMonths: 1 })
-    expect(buildFamilyRoute({ ...base, findings: [], periods: [latest, comparableOne, comparableTwo, comparableThree] }).nextAction.kind).toBe('clear')
-    expect(buildFamilyRoute({ ...base, findings: [], periods: [] }).nextAction.kind).toBe('clear')
+    expect(buildFamilyRoute({ ...base, findings: [], periods: [latest, comparableOne, comparableTwo, comparableThree] }).nextAction.kind).toBe('complete_contract_agenda')
+    expect(buildFamilyRoute({ ...base, findings: [], periods: [] }).nextAction.kind).toBe('complete_contract_agenda')
     expect(buildFamilyRoute({ ...base, expenses: [], findings: [], periods: [] }).nextAction.kind).toBe('empty')
   })
 

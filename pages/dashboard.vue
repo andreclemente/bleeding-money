@@ -23,6 +23,11 @@ const actionView = computed(() => {
     const remaining = action.daysUntil === 0 ? 'é hoje' : `faltam ${action.daysUntil} ${action.daysUntil === 1 ? 'dia' : 'dias'}`
     return { signal: action.label, title: `Rever ${item?.productName || 'contrato'}`, body: `${date(action.date)} · ${remaining}. ${action.action}`, why: action.daysUntil <= 15 ? 'É a data declarada mais próxima e está a 15 dias ou menos.' : 'Não há um caso estimado prioritário; esta é a data declarada mais próxima nos próximos 45 dias.', href: `/expenses/${action.expenseId}`, cta: 'Abrir contrato' }
   }
+  if (action.kind === 'complete_contract_agenda') {
+    const item = store.expenses.find((expense: RecurringExpense) => expense.id === action.expenseId)
+    const evidence = action.lastDeclaredDate ? ` Último prazo declarado: ${date(action.lastDeclaredDate)}.` : ''
+    return { signal: action.label, title: `Confirmar agenda de ${item?.productName || 'contrato'}`, body: `${action.action}${evidence}`, why: 'Sem uma próxima data real, o produto não consegue avisar a família a tempo. Confirma no contrato, fatura ou aviso do fornecedor; não inventes uma data.', href: `/expenses/${action.expenseId}?edit=agenda`, cta: 'Confirmar data' }
+  }
   if (action.kind === 'estimated_finding' || action.kind === 'factual_finding') {
     const item = route.cases.find((item: FamilyAuditCase) => item.finding.id === action.findingId)
     return { signal: action.kind === 'estimated_finding' ? 'Estimativa' : 'Facto', title: item?.finding.title || 'Rever caso', body: item?.finding.action || 'Confirma os dados antes de decidir.', why: action.kind === 'estimated_finding' ? 'É o caso aberto com maior prioridade e impacto identificável.' : 'Não há uma estimativa segura, mas existe um facto que merece revisão.', href: `/findings?open=${action.findingId}`, cta: 'Analisar caso' }

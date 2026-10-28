@@ -45,4 +45,13 @@ describe('Hoje', () => {
     expect(page).toContain('data declarada')
     expect(page).not.toContain("action.kind === 'insurance_renewal'")
   })
+
+  it('transforma uma agenda contratual incompleta numa missão factual sem inventar datas', async () => {
+    const page = await readFile(new URL('../../pages/dashboard.vue', import.meta.url), 'utf8')
+
+    expect(page).toContain("action.kind === 'complete_contract_agenda'")
+    expect(page).toContain('Confirmar agenda de')
+    expect(page).toContain('contrato, fatura ou aviso do fornecedor')
+    expect(page).toContain('?edit=agenda')
+  })
 })
