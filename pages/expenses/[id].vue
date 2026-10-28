@@ -263,6 +263,7 @@ const openAgendaEditor = () => {
   agendaSuccess.value = ''
   agendaEditorOpen.value = true
 }
+if (route.query.edit === 'agenda') openAgendaEditor()
 const saveAgenda = async () => {
   if (!data.value) return
   agendaError.value = ''

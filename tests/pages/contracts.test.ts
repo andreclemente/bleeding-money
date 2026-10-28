@@ -14,4 +14,14 @@ describe('inventário de contratos', () => {
     expect(page).toMatch(/Próximo prazo/i)
     expect(page).not.toMatch(/const renewalDate/)
   })
+
+  it('transforma agendas em falta ou desatualizadas numa fila factual para completar', async () => {
+    const page = await readFile(new URL('../../pages/expenses/index.vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/buildContractAgendaGapQueue/)
+    expect(page).toMatch(/Agenda por confirmar/i)
+    expect(page).toMatch(/entry\.action/)
+    expect(page).toMatch(/edit=agenda/)
+    expect(page).toMatch(/Não inventes uma data/i)
+  })
 })

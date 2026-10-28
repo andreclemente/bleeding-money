@@ -2,6 +2,13 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
 describe('detalhe do contrato', () => {
+  it('abre diretamente o editor de agenda quando a fila de contratos o pede', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/route\.query\.edit\s*===\s*'agenda'/)
+    expect(page).toMatch(/openAgendaEditor\(\)/)
+  })
+
   it('apresenta uma linha de vida auditável e mantém custo, variações e datas semanticamente separados', async () => {
     const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
 

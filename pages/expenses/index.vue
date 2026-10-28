@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { buildContractRadar, getNextDeclaredContractDate } from '../../domain/contract-agenda'
+import { buildContractAgendaGapQueue, buildContractRadar, getNextDeclaredContractDate } from '../../domain/contract-agenda'
 import type { ExpenseCategory, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const store = useSavingsStore()
@@ -24,6 +24,7 @@ const monthlyTotal = computed(() => expenses.value.reduce((sum: number, item: Re
 const today = new Date()
 const currentCivilDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 const radarItems = computed(() => buildContractRadar(expenses.value, currentCivilDate, 45))
+const agendaGaps = computed(() => buildContractAgendaGapQueue(expenses.value, currentCivilDate))
 const contractListDate = (item: RecurringExpense) => getNextDeclaredContractDate(item, currentCivilDate)
 </script>
 
@@ -78,6 +79,30 @@ const contractListDate = (item: RecurringExpense) => getNextDeclaredContractDate
           <NuxtLink :to="`/expenses/${entry.expenseId}`">
             <span><strong>{{ entry.productName }}</strong><small>{{ entry.provider }} · {{ entry.label }} · {{ civilDate(entry.date) }}</small><em>{{ entry.action }}</em></span>
             <b>{{ entry.daysUntil === 0 ? 'Hoje' : entry.daysUntil === 1 ? 'Amanhã' : `${entry.daysUntil} dias` }}</b>
+          </NuxtLink>
+        </li>
+      </ol>
+    </section>
+
+    <section
+      v-if="agendaGaps.length"
+      class="renewal-radar agenda-gaps"
+      aria-labelledby="agenda-gaps-title"
+    >
+      <div>
+        <span class="data-label">Evidência em falta</span><h2 id="agenda-gaps-title">
+          Agenda por confirmar
+        </h2>
+        <p>Não inventes uma data: confirma-a no contrato, fatura ou aviso do fornecedor.</p>
+      </div>
+      <ol>
+        <li
+          v-for="entry in agendaGaps"
+          :key="entry.expenseId"
+        >
+          <NuxtLink :to="`/expenses/${entry.expenseId}?edit=agenda`">
+            <span><strong>{{ entry.productName }}</strong><small>{{ entry.provider }} · {{ entry.label }}<template v-if="entry.lastDeclaredDate"> · {{ civilDate(entry.lastDeclaredDate) }}</template></small><em>{{ entry.action }}</em></span>
+            <b>Confirmar data</b>
           </NuxtLink>
         </li>
       </ol>

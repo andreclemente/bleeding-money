@@ -21,6 +21,16 @@ export type ContractRadarItem = {
   action: string
 }
 
+export type ContractAgendaGap = {
+  expenseId: string
+  productName: string
+  provider: string
+  status: 'stale' | 'missing'
+  label: string
+  action: string
+  lastDeclaredDate: string | null
+}
+
 const dayMs = 86_400_000
 const radarEventMeta: Record<ContractRadarItem['kind'], Pick<ContractRadarItem, 'label' | 'action'>> = {
   commitment: { label: 'Fim da fidelização', action: 'Preparar renegociação ou mudança.' },
@@ -93,4 +103,29 @@ export const getNextDeclaredContractDate = (expense: RecurringExpense, civilDate
   if (!isIsoDate(civilDate)) throw new Error('Data civil inválida.')
   const next = declaredEvents(expense).find(event => event.date >= civilDate)
   return next ? structuredClone(next) : null
+}
+
+export const buildContractAgendaGapQueue = (expenses: RecurringExpense[], civilDate: string): ContractAgendaGap[] => {
+  if (!isIsoDate(civilDate)) throw new Error('Data civil inválida.')
+
+  return expenses.flatMap((expense) => {
+    const events = declaredEvents(expense)
+    if (events.some(event => event.date >= civilDate)) return []
+    const lastDeclaredDate = events.at(-1)?.date || null
+    return [{
+      expenseId: expense.id,
+      productName: expense.productName,
+      provider: expense.provider,
+      status: lastDeclaredDate ? 'stale' as const : 'missing' as const,
+      label: lastDeclaredDate ? 'Prazo passado por confirmar' : 'Agenda não declarada',
+      action: lastDeclaredDate
+        ? 'Confirma se o contrato renovou e regista a próxima data real.'
+        : 'Regista uma data contratual apenas se constar do contrato ou aviso.',
+      lastDeclaredDate
+    }]
+  }).sort((left, right) => {
+    if (left.status !== right.status) return left.status === 'stale' ? -1 : 1
+    if (left.lastDeclaredDate !== right.lastDeclaredDate) return (right.lastDeclaredDate || '').localeCompare(left.lastDeclaredDate || '')
+    return left.expenseId.localeCompare(right.expenseId)
+  })
 }

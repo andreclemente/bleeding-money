@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractAgendaPatch, buildContractRadar, getNextDeclaredContractDate } from '../../domain/contract-agenda'
+import { buildContractAgendaGapQueue, buildContractAgendaPatch, buildContractRadar, getNextDeclaredContractDate } from '../../domain/contract-agenda'
 import type { RecurringExpense } from '../../domain/types'
 
 const insurance: RecurringExpense = {
@@ -105,5 +105,47 @@ describe('agenda contratual', () => {
       date: '2026-10-20'
     })
     expect(getNextDeclaredContractDate(telecom, '2026-12-01')).toBeNull()
+  })
+
+  it('separa contratos sem agenda dos que só têm prazos passados, sem inventar datas', () => {
+    const missing: RecurringExpense = {
+      ...insurance,
+      id: 'expense-missing',
+      category: 'subscription',
+      productName: 'Cloud',
+      commitmentEndDate: undefined,
+      details: { kind: 'subscription', plan: 'Pro' }
+    }
+    const stale: RecurringExpense = {
+      ...insurance,
+      id: 'expense-stale',
+      category: 'telecom',
+      productName: 'Fibra',
+      commitmentEndDate: '2026-09-01',
+      contractEndDate: '2026-10-01',
+      details: { kind: 'telecom', connectionType: 'fiber', downloadSpeedMbps: 500 }
+    }
+    const future = { ...insurance, id: 'expense-future', commitmentEndDate: undefined }
+
+    expect(buildContractAgendaGapQueue([future, stale, missing], '2026-10-15')).toEqual([
+      {
+        expenseId: 'expense-stale',
+        productName: 'Fibra',
+        provider: 'Seguradora',
+        status: 'stale',
+        label: 'Prazo passado por confirmar',
+        action: 'Confirma se o contrato renovou e regista a próxima data real.',
+        lastDeclaredDate: '2026-10-01'
+      },
+      {
+        expenseId: 'expense-missing',
+        productName: 'Cloud',
+        provider: 'Seguradora',
+        status: 'missing',
+        label: 'Agenda não declarada',
+        action: 'Regista uma data contratual apenas se constar do contrato ou aviso.',
+        lastDeclaredDate: null
+      }
+    ])
   })
 })
