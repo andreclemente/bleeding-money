@@ -24,7 +24,11 @@ export interface ExpenseInput {
   commitmentEndDate?: string
   details: CategoryDetails
 }
-export type ExpensePatchInput = Partial<Omit<ExpenseInput, 'category'>>
+export type ExpensePatchInput = Partial<Omit<ExpenseInput, 'category' | 'contractStartDate' | 'contractEndDate' | 'commitmentEndDate'>> & {
+  contractStartDate?: string | null
+  contractEndDate?: string | null
+  commitmentEndDate?: string | null
+}
 
 const categories = ['electricity', 'telecom', 'bank', 'subscription', 'insurance'] as const
 const insurancePolicyTypes = ['car', 'home', 'health', 'life', 'other'] as const
@@ -70,7 +74,7 @@ export const isIsoDate = (value: unknown): value is string => {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 const optionalDate = (value: unknown) => {
-  if (value === undefined) return undefined
+  if (value === undefined || value === null) return undefined
   if (!isIsoDate(value)) throw new Error('Data inválida')
   return value
 }
@@ -137,8 +141,8 @@ export const parseExpensePatchInput = (value: unknown): ExpensePatchInput => {
     if (result.currency !== 'EUR') throw new Error('A moeda suportada é EUR')
   }
   if (row.details !== undefined) result.details = parseDetails(row.details)
-  for (const key of dateKeys) if (row[key] !== undefined) result[key] = optionalDate(row[key])
-  validateCommitmentDates(result.contractStartDate, result.commitmentEndDate)
+  for (const key of dateKeys) if (row[key] !== undefined) result[key] = row[key] === null ? null : optionalDate(row[key])
+  validateCommitmentDates(result.contractStartDate ?? undefined, result.commitmentEndDate ?? undefined)
   return result
 }
 
@@ -617,7 +621,8 @@ export class MemoryRepository implements PoupancasRepository {
     if (!item) return null
     if (input.details && input.details.kind !== item.category) throw new Error('Detalhes incompatíveis com a categoria')
     const before = relevantState(item)
-    const candidate: RecurringExpense = { ...structuredClone(item), ...structuredClone(input), updatedAt: new Date().toISOString() }
+    const candidate = { ...structuredClone(item), ...structuredClone(input), updatedAt: new Date().toISOString() } as RecurringExpense
+    for (const key of dateKeys) if (input[key] === null) candidate[key] = undefined
     validateCommitmentDates(candidate.contractStartDate, candidate.commitmentEndDate)
     const changed = relevantState(candidate) !== before
     if (!changed) return structuredClone(item)

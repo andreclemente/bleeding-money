@@ -4,9 +4,14 @@ export interface ContractAgendaInput {
   commitmentEndDate?: string
   contractEndDate?: string
   renewalDate?: string
+  clearCommitmentEndDate?: boolean
+  clearContractEndDate?: boolean
+  clearRenewalDate?: boolean
 }
 
-export type ContractAgendaPatch = Pick<RecurringExpense, 'commitmentEndDate' | 'contractEndDate'> & {
+export type ContractAgendaPatch = {
+  commitmentEndDate?: string | null
+  contractEndDate?: string | null
   details?: RecurringExpense['details']
 }
 
@@ -65,10 +70,19 @@ export const buildContractAgendaPatch = (expense: RecurringExpense, input: Contr
   const contractEndDate = declaredDate(input.contractEndDate)
   const renewalDate = declaredDate(input.renewalDate)
 
-  if (commitmentEndDate && commitmentEndDate !== expense.commitmentEndDate) patch.commitmentEndDate = commitmentEndDate
-  if (contractEndDate && contractEndDate !== expense.contractEndDate) patch.contractEndDate = contractEndDate
+  if (input.clearCommitmentEndDate && expense.commitmentEndDate) patch.commitmentEndDate = null
+  else if (commitmentEndDate && commitmentEndDate !== expense.commitmentEndDate) patch.commitmentEndDate = commitmentEndDate
+  if (input.clearContractEndDate && expense.contractEndDate) patch.contractEndDate = null
+  else if (contractEndDate && contractEndDate !== expense.contractEndDate) patch.contractEndDate = contractEndDate
 
-  if (renewalDate) {
+  if (input.clearRenewalDate) {
+    if (expense.details.kind !== 'insurance') throw new Error('A renovação só se aplica a seguros.')
+    if (expense.details.renewalDate) {
+      const details = structuredClone(expense.details)
+      delete details.renewalDate
+      patch.details = details
+    }
+  } else if (renewalDate) {
     if (expense.details.kind !== 'insurance') throw new Error('A renovação só se aplica a seguros.')
     if (renewalDate !== expense.details.renewalDate) patch.details = { ...structuredClone(expense.details), renewalDate }
   }

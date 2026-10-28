@@ -39,6 +39,16 @@ describe('agenda contratual', () => {
     })).toThrow(/data diferente/i)
   })
 
+  it('permite retirar prazos que os documentos não sustentam sem apagar os restantes factos', () => {
+    expect(buildContractAgendaPatch(insurance, {
+      clearCommitmentEndDate: true,
+      clearRenewalDate: true
+    })).toEqual({
+      commitmentEndDate: null,
+      details: { kind: 'insurance', policyType: 'home', coverageCodes: ['building', 'contents'] }
+    })
+  })
+
   it('leva todos os prazos contratuais próximos para o radar, não apenas renovações de seguros', () => {
     const telecom: RecurringExpense = {
       ...insurance,

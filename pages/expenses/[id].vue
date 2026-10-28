@@ -251,6 +251,9 @@ const agendaEditorOpen = ref(false)
 const commitmentEndDate = ref('')
 const contractEndDate = ref('')
 const renewalDate = ref('')
+const clearCommitmentEndDate = ref(false)
+const clearContractEndDate = ref(false)
+const clearRenewalDate = ref(false)
 const savingAgenda = ref(false)
 const agendaError = ref('')
 const agendaSuccess = ref('')
@@ -259,6 +262,9 @@ const openAgendaEditor = () => {
   commitmentEndDate.value = data.value.expense.commitmentEndDate || ''
   contractEndDate.value = data.value.expense.contractEndDate || ''
   renewalDate.value = data.value.expense.details.kind === 'insurance' ? data.value.expense.details.renewalDate || '' : ''
+  clearCommitmentEndDate.value = false
+  clearContractEndDate.value = false
+  clearRenewalDate.value = false
   agendaError.value = ''
   agendaSuccess.value = ''
   agendaEditorOpen.value = true
@@ -273,7 +279,10 @@ const saveAgenda = async () => {
     const body = buildContractAgendaPatch(data.value.expense, {
       commitmentEndDate: commitmentEndDate.value,
       contractEndDate: contractEndDate.value,
-      renewalDate: insuranceDetails.value ? renewalDate.value : undefined
+      renewalDate: insuranceDetails.value ? renewalDate.value : undefined,
+      clearCommitmentEndDate: clearCommitmentEndDate.value,
+      clearContractEndDate: clearContractEndDate.value,
+      clearRenewalDate: insuranceDetails.value ? clearRenewalDate.value : false
     })
     await $fetch(`/api/expenses/${data.value.expense.id}`, { method: 'PATCH', body })
     await refresh()
@@ -809,22 +818,55 @@ const saveAgenda = async () => {
                 id="commitment-end-date"
                 v-model="commitmentEndDate"
                 type="date"
+                :disabled="clearCommitmentEndDate"
               >
+              <label
+                v-if="data.expense.commitmentEndDate"
+                class="agenda-form__clear"
+              >
+                <input
+                  v-model="clearCommitmentEndDate"
+                  type="checkbox"
+                >
+                <span>Retirar esta data: o documento não confirma o fim da fidelização</span>
+              </label>
               <label for="contract-end-date">Fim do contrato</label>
               <input
                 id="contract-end-date"
                 v-model="contractEndDate"
                 type="date"
+                :disabled="clearContractEndDate"
               >
+              <label
+                v-if="data.expense.contractEndDate"
+                class="agenda-form__clear"
+              >
+                <input
+                  v-model="clearContractEndDate"
+                  type="checkbox"
+                >
+                <span>Retirar esta data: o documento não confirma o fim do contrato</span>
+              </label>
               <template v-if="insuranceDetails">
                 <label for="renewal-date">Próxima renovação</label>
                 <input
                   id="renewal-date"
                   v-model="renewalDate"
                   type="date"
+                  :disabled="clearRenewalDate"
                 >
+                <label
+                  v-if="insuranceDetails.renewalDate"
+                  class="agenda-form__clear"
+                >
+                  <input
+                    v-model="clearRenewalDate"
+                    type="checkbox"
+                  >
+                  <span>Retirar esta data: o aviso não confirma a renovação</span>
+                </label>
               </template>
-              <small>Deixa um campo vazio para manter o valor atual. As datas ficam no histórico como uma atualização manual.</small>
+              <small>Deixa um campo vazio para manter o valor atual. Retira uma data apenas depois de confirmares que o documento não a sustenta. A correção fica no histórico como atualização manual.</small>
               <div class="observed-value__actions">
                 <button
                   type="button"

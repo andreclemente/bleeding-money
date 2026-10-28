@@ -45,6 +45,10 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Próxima renovação/i)
     expect(page).toMatch(/buildContractAgendaPatch/)
     expect(page).toMatch(/factos declarados/i)
+    expect(page).toMatch(/Retirar esta data/i)
+    expect(page).toMatch(/documento não confirma/i)
+    expect(page).toMatch(/clearCommitmentEndDate/)
+    expect(page).toMatch(/clearRenewalDate/)
   })
 
   it('transforma a agenda declarada num próximo passo concreto sem estimar poupanças', async () => {

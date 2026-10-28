@@ -345,6 +345,9 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .agenda-form { display: grid; gap: 8px }
 .agenda-form label { margin-top: 5px; color: var(--bm-ink-soft); font-size: .75rem; font-weight: 700 }
 .agenda-form input { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--bm-border-strong); border-radius: 9px; color: var(--bm-ink); background: var(--bm-surface); font: inherit }
+.agenda-form input:disabled { color: var(--bm-muted); background: var(--bm-surface-soft); opacity: .75 }
+.agenda-form .agenda-form__clear { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 5px; padding: 9px 10px; border: 1px solid var(--bm-border); border-radius: 9px; background: var(--bm-surface-soft); font-weight: 600; line-height: 1.4 }
+.agenda-form .agenda-form__clear input { flex: 0 0 auto; width: 16px; min-height: 16px; margin-top: 1px; padding: 0; accent-color: var(--bm-primary) }
 .agenda-form>small { margin: 4px 0; color: var(--bm-muted); font-size: .7rem; line-height: 1.45 }
 .decision-dates .form-error, .decision-dates .form-success { margin: 14px 0 0 }
 .health-indicator { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; font-weight: 600 }

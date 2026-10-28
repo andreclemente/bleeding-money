@@ -47,6 +47,35 @@ describe('DTO explícito de despesas', () => {
     expect(() => parseExpenseCreateInput({ category: 'insurance', provider: 'B', productName: 'P', monthlyCostCents: 100, currency: 'USD', details: { kind: 'insurance', policyType: 'home', coverageCodes: [] } })).toThrow(/EUR/i)
     expect(() => parseExpenseCreateInput({ category: 'subscription', provider: 'B', productName: 'P', monthlyCostCents: 2_147_483_648, details: { kind: 'subscription', plan: 'X' } })).toThrow('Custo inválido')
     expect(() => parseExpensePatchInput({ contractEndDate: '2026-02-30' })).toThrow('Data inválida')
+    expect(parseExpensePatchInput({ contractEndDate: null })).toEqual({ contractEndDate: null })
+    expect(parseExpensePatchInput({ details: { kind: 'insurance', policyType: 'home', renewalDate: null, coverageCodes: [] } })).toEqual({
+      details: { kind: 'insurance', policyType: 'home', renewalDate: undefined, coverageCodes: [] }
+    })
+  })
+
+  it('remove datas contratuais quando o PATCH recebe uma correção explícita', async () => {
+    const repo = new MemoryRepository()
+    const created = await repo.createExpense(DEMO_USER_ID, parseExpenseCreateInput({
+      category: 'insurance',
+      provider: 'Seguradora',
+      productName: 'Casa',
+      monthlyCostCents: 2400,
+      contractEndDate: '2027-01-01',
+      commitmentEndDate: '2026-12-01',
+      details: { kind: 'insurance', policyType: 'home', renewalDate: '2026-11-15', coverageCodes: ['building'] }
+    }))
+
+    await repo.updateExpense(DEMO_USER_ID, created.id, parseExpensePatchInput({
+      contractEndDate: null,
+      commitmentEndDate: null,
+      details: { kind: 'insurance', policyType: 'home', renewalDate: null, coverageCodes: ['building'] }
+    }))
+
+    expect((await repo.getExpense(DEMO_USER_ID, created.id))?.expense).toMatchObject({
+      contractEndDate: undefined,
+      commitmentEndDate: undefined,
+      details: { kind: 'insurance', policyType: 'home', renewalDate: undefined, coverageCodes: ['building'] }
+    })
   })
 })
 
