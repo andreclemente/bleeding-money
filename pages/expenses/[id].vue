@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalDecision, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -98,9 +98,20 @@ const proposalLaterMonthlyCost = ref('')
 const proposalError = ref('')
 const proposalComparison = ref<ReturnType<typeof compareContractProposal> | null>(null)
 const proposalDecision = computed(() => proposalComparison.value ? buildContractProposalDecision(proposalComparison.value) : null)
+const proposalActionStatus = ref('')
+const copyProposalAction = async () => {
+  if (!proposalComparison.value) return
+  try {
+    await navigator.clipboard.writeText(buildContractProposalActionNote(proposalComparison.value))
+    proposalActionStatus.value = 'Próxima ação copiada com os valores declarados.'
+  } catch {
+    proposalActionStatus.value = 'Não foi possível copiar a próxima ação.'
+  }
+}
 const compareProposal = () => {
   if (!data.value) return
   proposalError.value = ''
+  proposalActionStatus.value = ''
   proposalComparison.value = null
   try {
     if (!/^\d+$/.test(proposalCommitmentMonths.value.trim())) throw new Error('Indica a duração em meses inteiros.')
@@ -695,6 +706,20 @@ const saveAgenda = async () => {
                     <strong>{{ proposalDecision.title }}</strong>
                     <p>{{ proposalDecision.action }}</p>
                     <small>{{ proposalDecision.rule }}</small>
+                    <button
+                      class="secondary-action proposal-next-action__copy"
+                      type="button"
+                      @click="copyProposalAction"
+                    >
+                      Copiar próxima ação
+                    </button>
+                    <p
+                      v-if="proposalActionStatus"
+                      class="proposal-next-action__status"
+                      role="status"
+                    >
+                      {{ proposalActionStatus }}
+                    </p>
                   </div>
                 </div>
               </form>

@@ -313,6 +313,26 @@ export const buildContractProposalDecision = (comparison: ContractProposalCompar
   }
 }
 
+export const buildContractProposalActionNote = (comparison: ContractProposalComparison) => {
+  const decision = buildContractProposalDecision(comparison)
+  const priceLines = comparison.introductoryMonths === undefined
+    ? [`Mensalidade declarada: ${euros(comparison.proposedMonthlyCents)}`]
+    : [
+        `Preço inicial declarado: ${euros(comparison.proposedMonthlyCents)} durante ${comparison.introductoryMonths} meses`,
+        `Preço posterior declarado: ${euros(comparison.laterMonthlyCents!)}`
+      ]
+
+  return [
+    'Proposta em análise',
+    ...priceLines,
+    `Custo único declarado: ${euros(comparison.oneOffCents)}`,
+    `Período comparado: ${comparison.commitmentMonths} meses`,
+    `Custo total declarado: ${euros(comparison.proposedPeriodCents)}`,
+    `Próxima ação: ${decision.title} — ${decision.action}`,
+    'Estado: proposta não aceite; não é uma poupança confirmada.'
+  ].join('\n')
+}
+
 export const buildContractDecisionSignal = (events: ExpenseDecisionDate[], civilDate: string): ContractDecisionSignal | null => {
   const today = civilDay(civilDate)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(civilDate) || Number.isNaN(today) || new Date(today).toISOString().slice(0, 10) !== civilDate) throw new Error('Data civil inválida.')

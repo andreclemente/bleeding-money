@@ -320,6 +320,8 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .proposal-next-action>strong { font-size: .8rem }
 .proposal-next-action>p { margin: 0; color: var(--bm-ink-soft); font-size: .73rem; line-height: 1.45 }
 .proposal-next-action>small { color: var(--bm-muted); font-size: .65rem; line-height: 1.4 }
+.proposal-next-action__copy { justify-self: start; margin-top: 2px }
+.proposal-next-action>.proposal-next-action__status { margin: 0; color: var(--bm-muted); font-size: .68rem }
 .proposal-next-action--stop { border-color: var(--bm-danger); background: var(--bm-danger-soft) }
 .proposal-next-action--negotiate { border-color: var(--bm-warning); background: var(--bm-warning-soft) }
 .proposal-next-action--verify { border-color: var(--bm-success); background: var(--bm-success-soft) }

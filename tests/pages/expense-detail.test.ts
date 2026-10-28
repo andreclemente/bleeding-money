@@ -112,4 +112,13 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/proposalDecision\.action/)
     expect(page).toMatch(/proposalDecision\.rule/)
   })
+
+  it('permite levar a próxima ação e os valores declarados sem aceitar a proposta', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/buildContractProposalActionNote/)
+    expect(page).toMatch(/Copiar próxima ação/i)
+    expect(page).toMatch(/proposalActionStatus/)
+    expect(page).toMatch(/navigator\.clipboard\.writeText/)
+  })
 })

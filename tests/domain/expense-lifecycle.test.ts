@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalDecision, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildExpenseLifecycle, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -352,6 +352,25 @@ describe('linha de vida da despesa', () => {
       action: 'Pede por escrito o preço final, os serviços incluídos, os custos únicos e a data exata de fim da fidelização.',
       rule: 'A comparação é favorável, mas só um novo custo aceite e observado confirma poupança.'
     })
+  })
+
+  it('cria uma nota copiável com os valores declarados e uma única próxima ação', () => {
+    const comparison = compareContractProposal({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 4690,
+      oneOffCents: 5000,
+      commitmentMonths: 12
+    })
+
+    expect(buildContractProposalActionNote(comparison)).toBe([
+      'Proposta em análise',
+      'Mensalidade declarada: 46,90 €',
+      'Custo único declarado: 50,00 €',
+      'Período comparado: 12 meses',
+      'Custo total declarado: 612,80 €',
+      'Próxima ação: Não aceitar nestas condições — Pede uma mensalidade de 44,73 € ou menos, mantendo os restantes valores declarados.',
+      'Estado: proposta não aceite; não é uma poupança confirmada.'
+    ].join('\n'))
   })
 
   it('assinala propostas mais caras, não inventa ponto de equilíbrio e rejeita valores monetários inseguros', () => {
