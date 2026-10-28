@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildContractProposalReadiness, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildContractProposalReadiness, buildContractProposalValidity, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
@@ -92,6 +92,8 @@ const parseEuros = (value: string) => {
 const proposalMonthlyCost = ref('')
 const proposalOneOffCost = ref('0')
 const proposalExitCost = ref('')
+const proposalValidUntil = ref('')
+const proposalValidityUndeclared = ref(false)
 const proposalCommitmentMonths = ref('12')
 const proposalHasLaterPrice = ref(false)
 const proposalIntroductoryMonths = ref('')
@@ -104,6 +106,11 @@ const proposalReadiness = computed(() => buildContractProposalReadiness({
   scopeCompared: proposalScopeCompared.value,
   commitmentTermsConfirmed: proposalCommitmentTermsConfirmed.value
 }))
+const proposalValidity = computed(() => buildContractProposalValidity({
+  validUntil: proposalValidUntil.value,
+  validityUndeclared: proposalValidityUndeclared.value,
+  civilDate: currentCivilDate
+}))
 const proposalEquivalentInsuredScope = ref(false)
 const proposalComparableCoverage = ref(false)
 const proposalComparableDeductibles = ref(false)
@@ -114,12 +121,12 @@ const insuranceProposalReadiness = computed(() => buildInsuranceProposalReadines
 }))
 const proposalError = ref('')
 const proposalComparison = ref<ReturnType<typeof compareContractProposal> | null>(null)
-const proposalDecision = computed(() => proposalComparison.value ? buildContractProposalDecision(proposalComparison.value) : null)
+const proposalDecision = computed(() => proposalComparison.value ? buildContractProposalDecision(proposalComparison.value, proposalValidity.value) : null)
 const proposalActionStatus = ref('')
 const copyProposalAction = async () => {
   if (!proposalComparison.value) return
   try {
-    await navigator.clipboard.writeText(buildContractProposalActionNote(proposalComparison.value))
+    await navigator.clipboard.writeText(buildContractProposalActionNote(proposalComparison.value, proposalValidity.value))
     proposalActionStatus.value = 'Próxima ação copiada com os valores declarados.'
   } catch {
     proposalActionStatus.value = 'Não foi possível copiar a próxima ação.'
@@ -132,6 +139,7 @@ const compareProposal = () => {
   proposalComparison.value = null
   try {
     if (!proposalReadiness.value.ready) throw new Error(proposalReadiness.value.action)
+    if (!proposalValidity.value.ready) throw new Error(proposalValidity.value.action)
     if (insuranceDetails.value && !insuranceProposalReadiness.value.ready) throw new Error(insuranceProposalReadiness.value.action)
     if (!/^\d+$/.test(proposalCommitmentMonths.value.trim())) throw new Error('Indica a duração em meses inteiros.')
     if (proposalHasLaterPrice.value && !/^\d+$/.test(proposalIntroductoryMonths.value.trim())) throw new Error('Indica os meses ao preço inicial.')
@@ -154,6 +162,8 @@ watch([
   proposalFinalPriceConfirmed,
   proposalScopeCompared,
   proposalCommitmentTermsConfirmed,
+  proposalValidUntil,
+  proposalValidityUndeclared,
   proposalEquivalentInsuredScope,
   proposalComparableCoverage,
   proposalComparableDeductibles
@@ -686,6 +696,33 @@ const saveAgenda = async () => {
                     <small>{{ insuranceProposalReadiness.rule }}</small>
                   </div>
                 </fieldset>
+                <fieldset class="insurance-proposal-readiness">
+                  <legend>Validade da proposta</legend>
+                  <p>Regista a data indicada no documento. Se não existir, declara essa ausência em vez de inventar um prazo.</p>
+                  <label for="proposal-valid-until">Data-limite indicada</label>
+                  <input
+                    id="proposal-valid-until"
+                    v-model="proposalValidUntil"
+                    type="date"
+                    :disabled="proposalValidityUndeclared"
+                  >
+                  <label>
+                    <input
+                      v-model="proposalValidityUndeclared"
+                      type="checkbox"
+                    >
+                    <span>A proposta não indica uma data de validade</span>
+                  </label>
+                  <div
+                    class="insurance-proposal-readiness__status"
+                    :class="{ 'insurance-proposal-readiness__status--ready': proposalValidity.ready && proposalValidity.status !== 'expired' }"
+                    role="status"
+                  >
+                    <strong>{{ proposalValidity.label }}</strong>
+                    <p>{{ proposalValidity.action }}</p>
+                    <small>{{ proposalValidity.rule }}</small>
+                  </div>
+                </fieldset>
                 <label for="proposal-monthly-cost">Mensalidade proposta</label>
                 <div class="money-input">
                   <input
@@ -757,7 +794,7 @@ const saveAgenda = async () => {
                 <button
                   class="secondary-action"
                   type="submit"
-                  :disabled="!proposalReadiness.ready || (Boolean(insuranceDetails) && !insuranceProposalReadiness.ready)"
+                  :disabled="!proposalReadiness.ready || !proposalValidity.ready || (Boolean(insuranceDetails) && !insuranceProposalReadiness.ready)"
                 >
                   Comparar custo total
                 </button>
@@ -777,6 +814,7 @@ const saveAgenda = async () => {
                   <strong>Proposta em análise</strong>
                   <dl>
                     <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
+                    <div><dt>Validade da proposta</dt><dd>{{ proposalValidity.validUntil ? `${date(proposalValidity.validUntil)} · ${proposalValidity.label}` : proposalValidity.label }}</dd></div>
                     <div><dt>Custo de saída confirmado</dt><dd>{{ money(proposalComparison.exitCostCents || 0) }}</dd></div>
                     <div><dt>Custo no 1.º mês</dt><dd>{{ money(proposalComparison.firstMonthCents) }} · inclui custos únicos e saída</dd></div>
                     <div v-if="proposalComparison.introductoryMonths">

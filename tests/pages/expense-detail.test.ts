@@ -135,6 +135,17 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/inclui custos únicos e saída/i)
   })
 
+  it('exige uma validade declarada ou a ausência explícita desse facto antes de comparar', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/buildContractProposalValidity/)
+    expect(page).toMatch(/Validade da proposta/i)
+    expect(page).toMatch(/A proposta não indica uma data de validade/i)
+    expect(page).toMatch(/proposalValidity\.ready/)
+    expect(page).toMatch(/proposalValidity\.status/)
+    expect(page).toMatch(/proposalDecision\.title/)
+  })
+
   it('fecha a comparação com uma única próxima ação condicional e verificável', async () => {
     const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
 

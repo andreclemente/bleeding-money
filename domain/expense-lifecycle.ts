@@ -97,8 +97,23 @@ export type ContractProposalReadiness = {
   rule: string
 }
 
+export type ContractProposalValidity = {
+  ready: boolean
+  status: 'missing' | 'undeclared' | 'expired' | 'today' | 'soon' | 'valid'
+  validUntil: string | null
+  days: number | null
+  label: string
+  action: string
+  rule: string
+}
+
 const civilDay = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 const dayMs = 86_400_000
+const isCivilDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(civilDay(value)) && new Date(civilDay(value)).toISOString().slice(0, 10) === value
+const formatCivilDate = (value: string) => {
+  const [year, month, day] = value.split('-')
+  return `${day}/${month}/${year}`
+}
 
 const actionFor = (event: ExpenseDecisionDate) => {
   if (event.kind === 'renewal') return 'Confirma as condições de renovação junto do fornecedor.'
@@ -224,6 +239,83 @@ export const buildContractProposalReadiness = (input: {
     missing: [],
     action: 'Os factos essenciais da proposta foram confirmados; já podes comparar os custos declarados.',
     rule: 'A comparação continua condicional e não confirma poupança.'
+  }
+}
+
+export const buildContractProposalValidity = (input: {
+  validUntil: string
+  validityUndeclared: boolean
+  civilDate: string
+}): ContractProposalValidity => {
+  if (!isCivilDate(input.civilDate)) throw new Error('Data civil inválida.')
+  const validUntil = input.validUntil.trim()
+  if (input.validityUndeclared) {
+    return {
+      ready: true,
+      status: 'undeclared',
+      validUntil: null,
+      days: null,
+      label: 'Validade não declarada',
+      action: 'Confirma por escrito até quando a proposta pode ser aceite.',
+      rule: 'Não assumimos uma validade que o documento não declara.'
+    }
+  }
+  if (!validUntil) {
+    return {
+      ready: false,
+      status: 'missing',
+      validUntil: null,
+      days: null,
+      label: 'Validade por confirmar',
+      action: 'Indica a validade da proposta ou confirma que o documento não a declara.',
+      rule: 'A comparação fica bloqueada enquanto este facto não estiver declarado.'
+    }
+  }
+  if (!isCivilDate(validUntil)) throw new Error('Validade da proposta inválida.')
+
+  const days = (civilDay(validUntil) - civilDay(input.civilDate)) / dayMs
+  if (days < 0) {
+    const elapsed = Math.abs(days)
+    return {
+      ready: true,
+      status: 'expired',
+      validUntil,
+      days,
+      label: elapsed === 1 ? 'Expirou ontem' : `Expirou há ${elapsed} dias`,
+      action: 'Pede uma proposta atualizada antes de decidir.',
+      rule: 'Uma proposta expirada pode ser comparada como registo, mas não deve sustentar a decisão.'
+    }
+  }
+  if (days === 0) {
+    return {
+      ready: true,
+      status: 'today',
+      validUntil,
+      days,
+      label: 'Termina hoje',
+      action: 'Confirma por escrito as condições antes de decidir.',
+      rule: 'A data é declarada; não transforma a comparação em poupança confirmada.'
+    }
+  }
+  if (days <= 7) {
+    return {
+      ready: true,
+      status: 'soon',
+      validUntil,
+      days,
+      label: days === 1 ? 'Termina amanhã' : `Termina daqui a ${days} dias`,
+      action: 'Confirma por escrito as condições antes de decidir.',
+      rule: 'A data é declarada; não transforma a comparação em poupança confirmada.'
+    }
+  }
+  return {
+    ready: true,
+    status: 'valid',
+    validUntil,
+    days,
+    label: `Válida por mais ${days} dias`,
+    action: 'Mantém a data junto dos restantes valores declarados.',
+    rule: 'A data é declarada; não transforma a comparação em poupança confirmada.'
   }
 }
 
@@ -372,7 +464,23 @@ const euros = (cents: number) => {
   return `${Math.floor(absolute / 100)},${String(absolute % 100).padStart(2, '0')}\u00a0€`
 }
 
-export const buildContractProposalDecision = (comparison: ContractProposalComparison): ContractProposalDecision => {
+export const buildContractProposalDecision = (comparison: ContractProposalComparison, validity?: ContractProposalValidity): ContractProposalDecision => {
+  if (validity?.status === 'expired' && validity.validUntil) {
+    return {
+      tone: 'stop',
+      title: 'Pedir proposta atualizada',
+      action: `A validade declarada terminou em ${formatCivilDate(validity.validUntil)}. Pede os mesmos valores e condições por escrito numa proposta ainda válida.`,
+      rule: 'Não uses uma proposta expirada para decidir nem para confirmar poupança.'
+    }
+  }
+  if (validity?.status === 'undeclared') {
+    return {
+      tone: 'verify',
+      title: 'Confirmar validade da proposta',
+      action: 'Pede por escrito a data-limite para aceitar estes valores e condições.',
+      rule: 'Sem validade declarada, a comparação continua a ser apenas um cenário condicional.'
+    }
+  }
   if (comparison.laterRecurringDifferenceCents !== undefined && comparison.laterRecurringDifferenceCents < 0) {
     const exhaustion = typeof comparison.accumulatedAdvantageExhaustedMonth === 'number'
       ? ` Com os valores declarados, a vantagem acumulada esgota-se no ${comparison.accumulatedAdvantageExhaustedMonth}.º mês.`
@@ -414,8 +522,8 @@ export const buildContractProposalDecision = (comparison: ContractProposalCompar
   }
 }
 
-export const buildContractProposalActionNote = (comparison: ContractProposalComparison) => {
-  const decision = buildContractProposalDecision(comparison)
+export const buildContractProposalActionNote = (comparison: ContractProposalComparison, validity?: ContractProposalValidity) => {
+  const decision = buildContractProposalDecision(comparison, validity)
   const priceLines = comparison.introductoryMonths === undefined
     ? [`Mensalidade declarada: ${euros(comparison.proposedMonthlyCents)}`]
     : [
@@ -428,6 +536,7 @@ export const buildContractProposalActionNote = (comparison: ContractProposalComp
     ...priceLines,
     `Custo único declarado: ${euros(comparison.oneOffCents)}`,
     ...(comparison.exitCostCents !== undefined ? [`Custo de saída confirmado: ${euros(comparison.exitCostCents)}`] : []),
+    ...(validity?.validUntil ? [`Validade declarada: ${formatCivilDate(validity.validUntil)} · ${validity.label}`] : validity?.status === 'undeclared' ? ['Validade: não declarada no documento'] : []),
     `Período comparado: ${comparison.commitmentMonths} meses`,
     `Custo total declarado: ${euros(comparison.proposedPeriodCents)}`,
     `Próxima ação: ${decision.title} — ${decision.action}`,

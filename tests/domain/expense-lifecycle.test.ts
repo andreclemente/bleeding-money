@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildContractProposalReadiness, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
+import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildContractProposalReadiness, buildContractProposalValidity, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
 import type { ExpenseSnapshot, RecurringExpense } from '../../domain/types'
 
 const expense = (overrides: Partial<RecurringExpense> = {}): RecurringExpense => ({
@@ -388,6 +388,69 @@ describe('linha de vida da despesa', () => {
       'Próxima ação: Não aceitar nestas condições — Pede uma mensalidade de 44,73 € ou menos, mantendo os restantes valores declarados.',
       'Estado: proposta não aceite; não é uma poupança confirmada.'
     ].join('\n'))
+  })
+
+  it('torna a validade da proposta um facto obrigatório e trava decisões sobre propostas expiradas', () => {
+    expect(buildContractProposalValidity({
+      validUntil: '',
+      validityUndeclared: false,
+      civilDate: '2026-10-28'
+    })).toMatchObject({
+      ready: false,
+      status: 'missing',
+      action: 'Indica a validade da proposta ou confirma que o documento não a declara.'
+    })
+
+    const expired = buildContractProposalValidity({
+      validUntil: '2026-10-20',
+      validityUndeclared: false,
+      civilDate: '2026-10-28'
+    })
+    expect(expired).toMatchObject({
+      ready: true,
+      status: 'expired',
+      days: -8,
+      label: 'Expirou há 8 dias'
+    })
+
+    const comparison = compareContractProposal({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 3990,
+      oneOffCents: 0,
+      commitmentMonths: 24
+    })
+    expect(buildContractProposalDecision(comparison, expired)).toEqual({
+      tone: 'stop',
+      title: 'Pedir proposta atualizada',
+      action: 'A validade declarada terminou em 20/10/2026. Pede os mesmos valores e condições por escrito numa proposta ainda válida.',
+      rule: 'Não uses uma proposta expirada para decidir nem para confirmar poupança.'
+    })
+    expect(buildContractProposalActionNote(comparison, expired)).toContain('Validade declarada: 20/10/2026 · Expirou há 8 dias')
+  })
+
+  it('aceita validade não declarada sem a inventar e pede confirmação antes da decisão', () => {
+    const validity = buildContractProposalValidity({
+      validUntil: '',
+      validityUndeclared: true,
+      civilDate: '2026-10-28'
+    })
+    expect(validity).toMatchObject({
+      ready: true,
+      status: 'undeclared',
+      validUntil: null,
+      label: 'Validade não declarada'
+    })
+
+    const comparison = compareContractProposal({
+      currentMonthlyCents: 4890,
+      proposedMonthlyCents: 3990,
+      oneOffCents: 0,
+      commitmentMonths: 24
+    })
+    expect(buildContractProposalDecision(comparison, validity)).toMatchObject({
+      tone: 'verify',
+      title: 'Confirmar validade da proposta'
+    })
   })
 
   it('bloqueia a comparação até confirmar preço final, âmbito e prazo da proposta', () => {
