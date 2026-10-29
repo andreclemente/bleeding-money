@@ -549,7 +549,7 @@ export const buildContractProposalDecision = (comparison: ContractProposalCompar
   }
 }
 
-export const buildContractProposalActionNote = (comparison: ContractProposalComparison, validity?: ContractProposalValidity, identity?: ContractProposalIdentity) => {
+export const buildContractProposalActionNote = (comparison: ContractProposalComparison, validity?: ContractProposalValidity, identity?: ContractProposalIdentity, currentContract?: ContractProposalIdentity) => {
   const decision = buildContractProposalDecision(comparison, validity)
   const priceLines = comparison.introductoryMonths === undefined
     ? [`Mensalidade declarada: ${euros(comparison.proposedMonthlyCents)}`]
@@ -560,6 +560,7 @@ export const buildContractProposalActionNote = (comparison: ContractProposalComp
 
   return [
     'Proposta em análise',
+    ...(currentContract ? [`Contrato atual comparado: ${currentContract.provider} · ${currentContract.product} · ${euros(comparison.currentMonthlyCents)}/mês`] : []),
     ...(identity ? [`Fornecedor e plano declarados: ${identity.provider} · ${identity.product}`] : []),
     ...priceLines,
     `Custo único declarado: ${euros(comparison.oneOffCents)}`,

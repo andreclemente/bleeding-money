@@ -134,7 +134,17 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/proposalProvider/)
     expect(page).toMatch(/proposalProduct/)
     expect(page).toMatch(/Fornecedor e plano declarados/i)
-    expect(page).toMatch(/buildContractProposalActionNote\(proposalComparison\.value, proposalValidity\.value, proposalIdentity\.value\)/)
+    expect(page).toMatch(/buildContractProposalActionNote\(proposalComparison\.value, proposalValidity\.value, proposalIdentity\.value/)
+  })
+
+  it('identifica o contrato atual usado como base na comparação e na nota copiada', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Contrato atual comparado/i)
+    expect(page).toMatch(/data\.value\.expense\.provider/)
+    expect(page).toMatch(/data\.value\.expense\.productName/)
+    expect(page).toMatch(/Custo atual declarado/i)
+    expect(page).toMatch(/buildContractProposalActionNote\([\s\S]*currentContractIdentity/)
   })
 
   it('exige factos essenciais da proposta antes de comparar os números', async () => {

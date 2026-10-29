@@ -407,8 +407,12 @@ describe('linha de vida da despesa', () => {
     expect(buildContractProposalActionNote(comparison, undefined, {
       provider: 'Operador B',
       product: 'Fibra Casa 1 Gb'
+    }, {
+      provider: 'Operador A',
+      product: 'Fibra 500 Mb'
     })).toBe([
       'Proposta em análise',
+      'Contrato atual comparado: Operador A · Fibra 500 Mb · 48,90 €/mês',
       'Fornecedor e plano declarados: Operador B · Fibra Casa 1 Gb',
       'Mensalidade declarada: 46,90 €',
       'Custo único declarado: 50,00 €',

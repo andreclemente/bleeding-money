@@ -101,6 +101,10 @@ const proposalIdentity = computed(() => ({
   provider: proposalProvider.value.trim(),
   product: proposalProduct.value.trim()
 }))
+const currentContractIdentity = computed(() => ({
+  provider: data.value?.expense.provider || '',
+  product: data.value?.expense.productName || ''
+}))
 const proposalOneOffCost = ref('0')
 const proposalExitCost = ref('')
 const proposalOverlapMonths = ref('')
@@ -153,7 +157,7 @@ watch(proposalSavingFindings, (findings: SavingsFinding[]) => {
 const copyProposalAction = async () => {
   if (!proposalComparison.value) return
   try {
-    await navigator.clipboard.writeText(buildContractProposalActionNote(proposalComparison.value, proposalValidity.value, proposalIdentity.value))
+    await navigator.clipboard.writeText(buildContractProposalActionNote(proposalComparison.value, proposalValidity.value, proposalIdentity.value, currentContractIdentity.value))
     proposalActionStatus.value = 'Próxima ação copiada com os valores declarados.'
   } catch {
     proposalActionStatus.value = 'Não foi possível copiar a próxima ação.'
@@ -995,8 +999,9 @@ const saveAgenda = async () => {
                 >
                   <strong>Proposta em análise</strong>
                   <dl>
+                    <div><dt>Contrato atual comparado</dt><dd>{{ currentContractIdentity.provider }} · {{ currentContractIdentity.product }}</dd></div>
+                    <div><dt>Custo atual declarado</dt><dd>{{ money(proposalComparison.currentMonthlyCents) }} / mês · {{ money(proposalComparison.currentPeriodCents) }} nos {{ proposalComparison.commitmentMonths }} meses comparados</dd></div>
                     <div><dt>Fornecedor e plano declarados</dt><dd>{{ proposalIdentity.provider }} · {{ proposalIdentity.product }}</dd></div>
-                    <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
                     <div><dt>Validade da proposta</dt><dd>{{ proposalValidity.validUntil ? `${date(proposalValidity.validUntil)} · ${proposalValidity.label}` : proposalValidity.label }}</dd></div>
                     <div><dt>Custo de saída confirmado</dt><dd>{{ money(proposalComparison.exitCostCents || 0) }}</dd></div>
                     <div><dt>Custo de sobreposição confirmado</dt><dd>{{ money(proposalComparison.overlapCostCents || 0) }} · {{ proposalComparison.overlapMonths }} meses</dd></div>
