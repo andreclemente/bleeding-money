@@ -32,12 +32,12 @@ const close = () => {
   delete query.open
   void router.replace({ query })
 }
-const resolve = async (newCostCents: number) => {
+const resolve = async (newCostCents: number, actionDate: string) => {
   if (!current.value) return
   busy.value = true
   resolutionError.value = ''
   try {
-    await store.resolve(current.value.id, newCostCents)
+    await store.resolve(current.value.id, newCostCents, actionDate)
     close()
   } catch {
     resolutionError.value = 'Não foi possível marcar a recomendação como resolvida. Tenta novamente.'

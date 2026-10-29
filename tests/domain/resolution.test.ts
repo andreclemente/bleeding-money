@@ -29,6 +29,15 @@ describe('fluxo de resolução', () => {
     await expect(repo.resolveFinding(DEMO_USER_ID, id, 0, '2026-09-06')).rejects.toThrow()
   })
 
+  it('recusa confirmar poupança sem redução real ou com cobrança no futuro', async () => {
+    const repo = new MemoryRepository({ demo: true })
+    const findingId = '40000000-0000-4000-8000-000000000002'
+
+    await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 4890, '2026-09-06')).rejects.toThrow(/inferior/i)
+    await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 3490, '2999-01-01')).rejects.toThrow(/futuro/i)
+    expect(await repo.listActions(DEMO_USER_ID)).toHaveLength(0)
+  })
+
   it('recusa transformar uma revisão factual sem estimativa numa poupança', async () => {
     const repo = new MemoryRepository()
     const renewalDate = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10)

@@ -12,8 +12,8 @@ export const useSavingsStore = defineStore('savings', () => {
     try { [dashboard.value, expenses.value, findings.value] = await Promise.all([fetcher('/api/dashboard'), fetcher('/api/expenses'), fetcher('/api/findings')]) }
     finally { loading.value = false }
   }
-  const resolve = async (id: string, newCostCents: number) => {
-    await $fetch(`/api/findings/${id}/resolve`, { method: 'POST', body: { newCostCents } })
+  const resolve = async (id: string, newCostCents: number, actionDate: string) => {
+    await $fetch(`/api/findings/${id}/resolve`, { method: 'POST', body: { newCostCents, actionDate } })
     await refresh()
   }
   const dismiss = async (id: string) => {

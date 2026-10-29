@@ -56,7 +56,7 @@ const dialogStub = defineComponent({
     <div data-testid="dialog" :data-open="String(modelValue)" :data-current-cost="String(currentExpenseCostCents)">
       <p v-if="error" role="alert">{{ error }}</p>
       <button data-testid="neutral-close" @click="$emit('close')">fechar</button>
-      <button data-testid="resolve" @click="$emit('resolve', 3397)">resolver</button>
+      <button data-testid="resolve" @click="$emit('resolve', 3397, '2026-09-12')">resolver</button>
     </div>
   `
 })
@@ -163,5 +163,14 @@ describe('pages/findings', () => {
     const alert = wrapper.get('[role="alert"]')
     expect(alert.text()).toContain('Não foi possível marcar a recomendação como resolvida')
     expect(wrapper.get('[data-testid="dialog"]').attributes('data-open')).toBe('true')
+  })
+
+  it('envia a data da cobrança observada ao fechar a recomendação', async () => {
+    const wrapper = await mountPage()
+
+    await wrapper.get('[data-testid="resolve"]').trigger('click')
+    await flushPromises()
+
+    expect(store.resolve).toHaveBeenCalledWith(finding.id, 3397, '2026-09-12')
   })
 })

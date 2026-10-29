@@ -158,6 +158,8 @@ const confirmObservedProposal = async () => {
     if (proposalComparison.value.outcome !== 'lower' || proposalComparison.value.proposedMonthlyCents >= proposalComparison.value.currentMonthlyCents) throw new Error('Só uma mensalidade real inferior pode confirmar uma redução.')
     if (proposalValidity.value.status === 'expired') throw new Error('Pede uma proposta atualizada antes de confirmar a mudança.')
     if (!proposalObservedOnInvoice.value) throw new Error('Confirma primeiro que a mensalidade já apareceu numa fatura ou extrato.')
+    if (!proposalObservedDate.value) throw new Error('Indica a data da cobrança observada.')
+    if (proposalObservedDate.value > currentCivilDate) throw new Error('A data da cobrança não pode estar no futuro.')
     if (!proposalSavingFindings.value.some((item: SavingsFinding) => item.id === proposalFindingId.value)) throw new Error('Escolhe uma recomendação de poupança ainda aberta.')
     await $fetch(`/api/findings/${proposalFindingId.value}/resolve`, {
       method: 'POST',
@@ -1041,6 +1043,7 @@ const saveAgenda = async () => {
                       id="proposal-observed-date"
                       v-model="proposalObservedDate"
                       type="date"
+                      :max="currentCivilDate"
                     >
                     <label>
                       <input

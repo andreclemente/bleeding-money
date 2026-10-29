@@ -287,8 +287,9 @@ export class PostgresRepository implements PoupancasRepository {
       const row = (await client.query("select f.id,f.type,f.expense_id,f.estimated_monthly_saving_max_cents,e.monthly_cost_cents from savings_findings f join recurring_expenses e on e.id=f.expense_id where f.id=$1 and e.user_id=$2 and f.status='open' for update", [id, userId])).rows[0]
       if (!row) throw new Error('Finding não encontrado ou já fechado')
       if (Number(row.estimated_monthly_saving_max_cents) <= 0) throw new Error('Esta revisão não tem uma poupança estimada e só pode ser concluída sem registar uma ação de poupança')
+      if (actionDate > new Date().toISOString().slice(0, 10)) throw new Error('A data da cobrança não pode estar no futuro')
       const previousCostCents = Number(row.monthly_cost_cents)
-      if (newCostCents > previousCostCents) throw new Error('O novo custo não pode ser superior ao custo anterior')
+      if (newCostCents >= previousCostCents) throw new Error('O novo custo tem de ser inferior ao custo anterior')
       const action: SavingAction = { id: crypto.randomUUID(), findingId: id, previousCostCents, newCostCents, actionDate, annualSavingCents: annualSaving(previousCostCents, newCostCents), createdAt: new Date().toISOString() }
       await client.query('insert into saving_actions (id,finding_id,previous_cost_cents,new_cost_cents,action_date,annual_saving_cents) values ($1,$2,$3,$4,$5,$6)', [action.id, id, previousCostCents, newCostCents, actionDate, action.annualSavingCents])
       await client.query("update savings_findings set status='resolved',resolved_at=now() where id=$1", [id])

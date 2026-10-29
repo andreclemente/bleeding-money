@@ -91,7 +91,7 @@ describe('RecommendationDetailDialog', () => {
 
   it.each([
     ['-1', 'não pode ser negativo'],
-    ['49.00', 'não pode ser superior'],
+    ['49.00', 'tem de ser inferior'],
     ['12.345', 'no máximo duas casas decimais'],
     ['NaN', 'Introduz um valor válido']
   ])('blocks invalid proposed cost %s with inline PT-PT guidance', async (value, guidance) => {
@@ -105,13 +105,17 @@ describe('RecommendationDetailDialog', () => {
     expect(wrapper.emitted('resolve')).toBeUndefined()
   })
 
-  it('emits an exact integer-cent value when the proposed cost is valid', async () => {
+  it('só confirma uma redução com cobrança observada e emite cêntimos e data exatos', async () => {
     const wrapper = mountDialog()
 
     await wrapper.get('[data-testid="new-cost"]').setValue('12.34')
+    expect(wrapper.get('[data-testid="resolve-finding"]').attributes()).toHaveProperty('disabled')
+    await wrapper.get('[data-testid="observed-date"]').setValue('2026-09-12')
+    await wrapper.get('[data-testid="observed-evidence"]').setValue(true)
     await wrapper.get('[data-testid="resolve-finding"]').trigger('click')
 
-    expect(wrapper.emitted('resolve')).toEqual([[1234]])
+    expect(wrapper.emitted('resolve')).toEqual([[1234, '2026-09-12']])
+    expect(wrapper.text()).toContain('fatura, recibo ou extrato')
   })
 
   it('trata avisos sem estimativa como revisão, sem custo novo nem poupança zero', () => {

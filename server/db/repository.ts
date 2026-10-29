@@ -647,7 +647,8 @@ export class MemoryRepository implements PoupancasRepository {
     const expense = finding && this.expenses.find(item => item.id === finding.expenseId && item.userId === userId)
     if (!finding || !expense) throw new Error('Finding não encontrado ou já fechado')
     if (finding.estimatedMonthlySavingMaxCents <= 0) throw new Error('Esta revisão não tem uma poupança estimada e só pode ser concluída sem registar uma ação de poupança')
-    if (newCostCents > expense.monthlyCostCents) throw new Error('O novo custo não pode ser superior ao custo anterior')
+    if (actionDate > new Date().toISOString().slice(0, 10)) throw new Error('A data da cobrança não pode estar no futuro')
+    if (newCostCents >= expense.monthlyCostCents) throw new Error('O novo custo tem de ser inferior ao custo anterior')
     const timestamp = new Date().toISOString()
     const action: SavingAction = { id: crypto.randomUUID(), findingId: finding.id, previousCostCents: expense.monthlyCostCents, newCostCents, actionDate, annualSavingCents: annualSaving(expense.monthlyCostCents, newCostCents), createdAt: timestamp }
     const candidate: RecurringExpense = { ...structuredClone(expense), monthlyCostCents: newCostCents, updatedAt: timestamp }

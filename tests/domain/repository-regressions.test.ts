@@ -152,7 +152,7 @@ describe('resolução segura e reconciliação', () => {
   it('rejeita custo superior, datas inválidas e fecha recomendações irmãs obsoletas', async () => {
     const repo = new MemoryRepository({ demo: true })
     const findingId = '40000000-0000-4000-8000-000000000002'
-    await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 5000, '2026-09-06')).rejects.toThrow('superior')
+    await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 5000, '2026-09-06')).rejects.toThrow('inferior')
     await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 3490, '2026-02-30')).rejects.toThrow('Data inválida')
     await repo.resolveFinding(DEMO_USER_ID, findingId, 3490, '2026-09-06')
     const detail = await repo.getExpense(DEMO_USER_ID, '10000000-0000-4000-8000-000000000002')

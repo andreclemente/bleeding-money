@@ -13,10 +13,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   dismiss: []
-  resolve: [newCostCents: number]
+  resolve: [newCostCents: number, actionDate: string]
 }>()
 
 const newCost = ref<string | number>('')
+const observedDate = ref('')
+const observedEvidence = ref(false)
+const now = new Date()
+const currentCivilDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 const money = (cents: number) => new Intl.NumberFormat('pt-PT', {
   style: 'currency',
   currency: 'EUR'
@@ -31,7 +35,11 @@ const hasEstimatedSaving = computed(() => !!props.finding && (props.finding.esti
 
 watch(
   [() => props.finding?.id, () => props.currentExpenseCostCents],
-  () => { newCost.value = '' }
+  () => {
+    newCost.value = ''
+    observedDate.value = ''
+    observedEvidence.value = false
+  }
 )
 
 const parsedNewCost = computed(() => {
@@ -42,15 +50,21 @@ const parsedNewCost = computed(() => {
   if (!Number.isFinite(euros)) return { error: 'Introduz um valor válido em euros.' }
   if (euros < 0) return { error: 'O novo custo não pode ser negativo.' }
   const cents = Math.round(euros * 100)
-  if (cents > props.currentExpenseCostCents) return { error: 'O novo custo não pode ser superior ao custo mensal atual.' }
+  if (cents >= props.currentExpenseCostCents) return { error: 'O novo custo tem de ser inferior ao custo mensal atual.' }
   return { cents, error: '' }
 })
 const costError = computed(() => parsedNewCost.value.error)
+const evidenceError = computed(() => {
+  if (!observedDate.value) return 'Indica a data da cobrança observada.'
+  if (observedDate.value > currentCivilDate) return 'A data da cobrança não pode estar no futuro.'
+  if (!observedEvidence.value) return 'Confirma que o valor aparece numa fatura, recibo ou extrato.'
+  return ''
+})
 
 const close = () => emit('close')
 const resolve = () => {
-  if (parsedNewCost.value.cents === undefined || costError.value) return
-  emit('resolve', parsedNewCost.value.cents)
+  if (parsedNewCost.value.cents === undefined || costError.value || evidenceError.value) return
+  emit('resolve', parsedNewCost.value.cents, observedDate.value)
 }
 </script>
 
@@ -150,6 +164,35 @@ const resolve = () => {
           step="0.01"
         />
 
+        <div
+          v-if="hasEstimatedSaving"
+          class="resolution-evidence"
+        >
+          <label for="observed-date">Data da cobrança observada</label>
+          <input
+            id="observed-date"
+            v-model="observedDate"
+            data-testid="observed-date"
+            type="date"
+            :max="currentCivilDate"
+          >
+          <label>
+            <input
+              v-model="observedEvidence"
+              data-testid="observed-evidence"
+              type="checkbox"
+            >
+            <span>Confirmei o novo valor numa fatura, recibo ou extrato</span>
+          </label>
+          <p
+            v-if="observedDate || observedEvidence"
+            class="resolution-help"
+            :class="{ 'resolution-error': evidenceError }"
+          >
+            {{ evidenceError || 'A cobrança observada pode confirmar uma redução real.' }}
+          </p>
+        </div>
+
         <p
           v-if="error"
           class="resolution-error"
@@ -161,7 +204,7 @@ const resolve = () => {
         <div class="action-explanations">
           <p><strong>Dispensar</strong> remove esta recomendação da lista sem registar poupança.</p>
           <p v-if="hasEstimatedSaving">
-            <strong>Marcar como resolvida</strong> regista a ação e calcula a poupança realizada.
+            <strong>Registar redução confirmada</strong> guarda apenas um custo inferior já observado e calcula a poupança anual real.
           </p>
           <p v-else>
             <strong>Marcar revisão como concluída</strong> fecha este aviso sem registar qualquer poupança.
@@ -192,10 +235,10 @@ const resolve = () => {
             data-testid="resolve-finding"
             color="primary"
             :loading="busy"
-            :disabled="busy || !!costError"
+            :disabled="busy || !!costError || !!evidenceError"
             @click="resolve"
           >
-            Marcar como resolvida
+            Registar redução confirmada
           </v-btn>
         </div>
       </v-card-actions>

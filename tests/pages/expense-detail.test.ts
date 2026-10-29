@@ -206,6 +206,8 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Confirmar mudança já faturada/i)
     expect(page).toMatch(/Já confirmei esta mensalidade numa fatura ou extrato/i)
     expect(page).toMatch(/proposalObservedDate/)
+    expect(page).toMatch(/:max="currentCivilDate"/)
+    expect(page).toMatch(/não pode estar no futuro/i)
     expect(page).toMatch(/estimatedMonthlySavingMaxCents\s*>\s*0/)
     expect(page).toMatch(/\/api\/findings\/\$\{proposalFindingId\.value\}\/resolve/)
     expect(page).toMatch(/newCostCents:\s*proposalComparison\.value\.proposedMonthlyCents/)
