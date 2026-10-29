@@ -163,6 +163,16 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/proposalDecision\.rule/)
   })
 
+  it('retira resultados desatualizados quando qualquer valor da proposta muda', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/proposalComparisonStatus/)
+    expect(page).toMatch(/proposalMonthlyCost,[\s\S]*proposalOneOffCost,[\s\S]*proposalExitCost,[\s\S]*proposalCommitmentMonths,[\s\S]*proposalIntroductoryMonths,[\s\S]*proposalLaterMonthlyCost/)
+    expect(page).toMatch(/hadComparison[\s\S]*proposalComparison\.value\s*=\s*null/)
+    expect(page).toMatch(/Valores alterados\. Volta a comparar antes de usar estes resultados\./)
+    expect(page).toMatch(/class="proposal-comparison__stale"/)
+  })
+
   it('permite levar a próxima ação e os valores declarados sem aceitar a proposta', async () => {
     const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
 

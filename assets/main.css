@@ -316,6 +316,7 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .proposal-comparison__months input { min-width: 0; min-height: 42px; padding: 0 12px; border: 0; color: var(--bm-ink); background: transparent }
 .proposal-comparison__months span { padding: 0 12px; color: var(--bm-muted); font-size: .72rem; font-weight: 700 }
 .proposal-comparison .form-error { margin: 2px 0 0 }
+.proposal-comparison__stale { margin: 2px 0 0; padding: 9px 10px; border-left: 3px solid var(--bm-warning); background: var(--bm-warning-soft); color: var(--bm-ink-soft); font-size: .72rem; line-height: 1.45 }
 .proposal-comparison__result { display: grid; gap: 8px; margin-top: 5px; padding: 12px; border-left: 3px solid var(--bm-warning); background: var(--bm-warning-soft) }
 .proposal-comparison__result--lower { border-color: var(--bm-success); background: var(--bm-success-soft) }
 .proposal-comparison__result--higher { border-color: var(--bm-danger); background: var(--bm-danger-soft) }

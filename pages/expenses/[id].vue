@@ -126,6 +126,7 @@ const proposalError = ref('')
 const proposalComparison = ref<ReturnType<typeof compareContractProposal> | null>(null)
 const proposalDecision = computed(() => proposalComparison.value ? buildContractProposalDecision(proposalComparison.value, proposalValidity.value) : null)
 const proposalActionStatus = ref('')
+const proposalComparisonStatus = ref('')
 const copyProposalAction = async () => {
   if (!proposalComparison.value) return
   try {
@@ -139,6 +140,7 @@ const compareProposal = () => {
   if (!data.value) return
   proposalError.value = ''
   proposalActionStatus.value = ''
+  proposalComparisonStatus.value = ''
   proposalComparison.value = null
   try {
     if (!proposalReadiness.value.ready) throw new Error(proposalReadiness.value.action)
@@ -162,6 +164,12 @@ const compareProposal = () => {
   }
 }
 watch([
+  proposalMonthlyCost,
+  proposalOneOffCost,
+  proposalExitCost,
+  proposalCommitmentMonths,
+  proposalIntroductoryMonths,
+  proposalLaterMonthlyCost,
   proposalFinalPriceConfirmed,
   proposalScopeCompared,
   proposalCommitmentTermsConfirmed,
@@ -173,8 +181,11 @@ watch([
   proposalComparableCoverage,
   proposalComparableDeductibles
 ], () => {
+  const hadComparison = proposalComparison.value !== null
   proposalComparison.value = null
   proposalActionStatus.value = ''
+  proposalError.value = ''
+  if (hadComparison) proposalComparisonStatus.value = 'Valores alterados. Volta a comparar antes de usar estes resultados.'
 })
 const proposalOutcome = computed(() => {
   const comparison = proposalComparison.value
@@ -827,6 +838,13 @@ const saveAgenda = async () => {
                 >
                   Comparar custo total
                 </button>
+                <p
+                  v-if="proposalComparisonStatus"
+                  class="proposal-comparison__stale"
+                  role="status"
+                >
+                  {{ proposalComparisonStatus }}
+                </p>
                 <p
                   v-if="proposalError"
                   class="form-error"
