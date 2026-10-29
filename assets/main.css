@@ -789,6 +789,17 @@ h1, h2 { font-family: inherit; font-weight: 400 }
 .goal-scenario-value strong { margin-bottom: 12px; font-size: 2.5rem; font-weight: 300 }
 .goal-scenario-value span, .goal-bridge>p { color: var(--bm-muted); font-size: .8rem; line-height: 1.5 }
 .goal-bridge>p strong { color: var(--bm-ink) }
+.goal-evidence { padding-top: 24px }
+.goal-evidence .section-heading { margin-bottom: 12px }
+.goal-evidence-list { margin: 0; padding: 0; border-top: 1px solid var(--bm-ink); list-style: none }
+.goal-evidence-list li { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(220px, 1fr) minmax(170px, .55fr); align-items: center; border-bottom: 1px solid var(--bm-border); background: white }
+.goal-evidence-list li>span { min-height: 86px; padding: 18px 20px; border-right: 1px solid var(--bm-border) }
+.goal-evidence-list li>span:last-child { border-right: 0 }
+.goal-evidence-list small, .goal-evidence-list strong { display: block }
+.goal-evidence-list small { margin-bottom: 8px; color: var(--bm-muted); font-size: .68rem; letter-spacing: .05em; text-transform: uppercase }
+.goal-evidence-list strong { font-weight: 500 }
+.goal-evidence-saving strong { color: #0e6027; font-size: 1.25rem }
+.goal-evidence-empty { border-top: 1px solid var(--bm-ink); background: white }
 .goal-proof { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--bm-ink) }
 .goal-proof>div { min-height: 126px; padding: 20px; border-right: 1px solid var(--bm-border); background: white }
 .goal-proof span, .goal-proof strong, .goal-proof small { display: block }
@@ -833,6 +844,9 @@ h1, h2 { font-family: inherit; font-weight: 400 }
   .contract-arrow { display: none }
   .goal-command__main, .goal-command__remaining { padding: 28px 20px }
   .goal-bridge>div, .goal-bridge>p { min-height: auto }
+  .goal-evidence-list li { grid-template-columns: 1fr }
+  .goal-evidence-list li>span { min-height: auto; border-right: 0; border-bottom: 1px solid var(--bm-border) }
+  .goal-evidence-list li>span:last-child { border-bottom: 0 }
   .goal-proof { grid-template-columns: 1fr }
   .goal-proof>div { min-height: auto; border-right: 0; border-bottom: 1px solid var(--bm-border) }
   .audit-footer { align-items: flex-start; flex-direction: column }

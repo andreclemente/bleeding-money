@@ -14,6 +14,7 @@ const error = ref('')
 const name = ref(goal.value?.name || '')
 const targetEuros = ref(goal.value ? (goal.value.targetAnnualCents / 100).toFixed(2) : '')
 const money = (cents: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(cents / 100)
+const civilDate = (value: string) => new Intl.DateTimeFormat('pt-PT', { dateStyle: 'medium' }).format(new Date(`${value}T12:00:00Z`))
 const percentage = (value: number, target: number) => target > 0 ? Math.min(100, Math.round(value / target * 100)) : 0
 const scenario = computed(() => {
   if (!goal.value || !route.identifiedMonthlyRangeCents.maxCents) return null
@@ -121,6 +122,40 @@ const save = async () => {
           class="decision-empty"
         >
           <strong>Sem cenário por confirmar</strong><p>A próxima melhoria aparecerá aqui quando existir um caso com intervalo estimado.</p>
+        </div>
+      </section>
+
+      <section
+        class="goal-evidence"
+        aria-labelledby="goal-evidence-title"
+      >
+        <div class="section-heading compact-heading">
+          <div>
+            <span class="data-label">Extrato auditável</span>
+            <h2 id="goal-evidence-title">
+              Provas que contam para o objetivo
+            </h2>
+          </div>
+          <small>Cada linha nasce de uma cobrança real confirmada.</small>
+        </div>
+        <ol
+          v-if="route.decisions.length"
+          class="goal-evidence-list"
+        >
+          <li
+            v-for="decision in route.decisions.slice(0, 5)"
+            :key="decision.id"
+          >
+            <span class="goal-evidence-date"><small>Cobrança confirmada</small>{{ civilDate(decision.actionDate) }}</span>
+            <span class="goal-evidence-change"><small>Custo mensal observado</small><strong>{{ money(decision.previousCostCents) }} → {{ money(decision.newCostCents) }}</strong></span>
+            <span class="goal-evidence-saving"><small>Redução anual real</small><strong>{{ money(decision.annualSavingCents) }}</strong></span>
+          </li>
+        </ol>
+        <div
+          v-else
+          class="decision-empty goal-evidence-empty"
+        >
+          <strong>Ainda não existe prova para este objetivo</strong><p>Uma estimativa ou proposta só aparece aqui depois de confirmares uma cobrança inferior numa fatura, recibo ou extrato.</p>
         </div>
       </section>
 
