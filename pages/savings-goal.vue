@@ -146,9 +146,23 @@ const save = async () => {
             v-for="decision in route.decisions.slice(0, 5)"
             :key="decision.id"
           >
-            <span class="goal-evidence-date"><small>Cobrança confirmada</small>{{ civilDate(decision.actionDate) }}</span>
-            <span class="goal-evidence-change"><small>Custo mensal observado</small><strong>{{ money(decision.previousCostCents) }} → {{ money(decision.newCostCents) }}</strong></span>
-            <span class="goal-evidence-saving"><small>Redução anual real</small><strong>{{ money(decision.annualSavingCents) }}</strong></span>
+            <NuxtLink
+              v-if="decision.expenseId"
+              class="goal-evidence-entry"
+              :to="`/expenses/${decision.expenseId}`"
+            >
+              <span class="goal-evidence-date"><small>Contrato confirmado</small><strong>{{ decision.provider }} · {{ decision.productName }}</strong><em>Cobrança confirmada · {{ civilDate(decision.actionDate) }}</em></span>
+              <span class="goal-evidence-change"><small>Custo mensal observado</small><strong>{{ money(decision.previousCostCents) }} → {{ money(decision.newCostCents) }}</strong></span>
+              <span class="goal-evidence-saving"><small>Redução anual real</small><strong>{{ money(decision.annualSavingCents) }}</strong><em>Abrir Linha de Vida →</em></span>
+            </NuxtLink>
+            <div
+              v-else
+              class="goal-evidence-entry goal-evidence-entry--orphan"
+            >
+              <span class="goal-evidence-date"><small>Cobrança confirmada</small><strong>Contrato já indisponível</strong><em>{{ civilDate(decision.actionDate) }}</em></span>
+              <span class="goal-evidence-change"><small>Custo mensal observado</small><strong>{{ money(decision.previousCostCents) }} → {{ money(decision.newCostCents) }}</strong></span>
+              <span class="goal-evidence-saving"><small>Redução anual real</small><strong>{{ money(decision.annualSavingCents) }}</strong><em>Prova histórica preservada</em></span>
+            </div>
           </li>
         </ol>
         <div
