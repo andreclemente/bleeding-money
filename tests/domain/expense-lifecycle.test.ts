@@ -276,6 +276,31 @@ describe('linha de vida da despesa', () => {
     })
   })
 
+  it('inclui meses confirmados de sobreposição sem fabricar uma mudança imediata', () => {
+    const comparison = compareContractProposal({
+      currentMonthlyCents: 5000,
+      proposedMonthlyCents: 4000,
+      oneOffCents: 0,
+      exitCostCents: 0,
+      overlapMonths: 2,
+      commitmentMonths: 12
+    })
+
+    expect(comparison).toMatchObject({
+      overlapMonths: 2,
+      overlapCostCents: 10_000,
+      firstMonthCents: 9_000,
+      firstMonthDifferenceCents: -4_000,
+      firstPeriodCents: 58_000,
+      proposedPeriodCents: 58_000,
+      periodDifferenceCents: 2_000,
+      maximumMonthlyCentsForNoIncrease: 4_166,
+      breakEvenMonth: 10,
+      outcome: 'lower'
+    })
+    expect(buildContractProposalActionNote(comparison)).toContain('Sobreposição confirmada: 2 meses · 100,00 €')
+  })
+
   it('expõe quando o preço posterior à promoção fica acima do contrato atual', () => {
     expect(compareContractProposal({
       currentMonthlyCents: 4890,
@@ -488,8 +513,8 @@ describe('linha de vida da despesa', () => {
       pricePath: 'stable'
     })).toEqual({
       ready: false,
-      missing: ['Custos únicos e custo de saída confirmados'],
-      action: 'Confirma os custos únicos da proposta e o custo para sair do contrato atual, mesmo quando sejam zero.',
+      missing: ['Custos únicos, saída e sobreposição confirmados'],
+      action: 'Confirma os custos únicos, o custo para sair e os meses com ambos os contratos a pagar, mesmo quando sejam zero.',
       rule: 'Sem estes factos, uma mensalidade isolada não permite uma comparação auditável.'
     })
   })
@@ -554,6 +579,7 @@ describe('linha de vida da despesa', () => {
     })
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: Number.MAX_SAFE_INTEGER, oneOffCents: 0, commitmentMonths: 12 })).toThrow(/Valor monetário inválido/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, exitCostCents: -1, commitmentMonths: 12 })).toThrow(/Valor monetário inválido/)
+    expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, overlapMonths: 13, commitmentMonths: 12 })).toThrow(/Sobreposição inválida/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 0 })).toThrow(/Duração inválida/)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 12, introductoryMonths: 3 })).toThrow(/preço posterior/i)
     expect(() => compareContractProposal({ currentMonthlyCents: 2000, proposedMonthlyCents: 1900, oneOffCents: 0, commitmentMonths: 12, introductoryMonths: 13, laterMonthlyCents: 2000 })).toThrow(/Duração promocional inválida/)

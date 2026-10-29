@@ -94,7 +94,7 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Custo anual depois da promoção/i)
     expect(page).toMatch(/por ano face ao custo atual declarado/i)
     expect(page).toMatch(/Custo nos primeiros/i)
-    expect(page).toMatch(/inclui custos únicos e saída/i)
+    expect(page).toMatch(/inclui custos únicos, saída e (?:eventual )?sobreposição/i)
     expect(page).toMatch(/face ao custo atual no mesmo período/i)
     expect(page).toMatch(/Custo no 1.º mês/i)
     expect(page).toMatch(/esforço inicial/i)
@@ -122,7 +122,7 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Preço final com impostos, descontos e extras confirmado/i)
     expect(page).toMatch(/Serviços ou condições incluídos comparados/i)
     expect(page).toMatch(/Fidelização, renovação e cancelamento confirmados/i)
-    expect(page).toMatch(/Custos únicos e custo de saída confirmados/i)
+    expect(page).toMatch(/Custos únicos, saída e sobreposição confirmados/i)
     expect(page).toMatch(/Trajetória do preço durante o período comparado/i)
     expect(page).toMatch(/Mantém-se durante todo o período/i)
     expect(page).toMatch(/Muda durante o período/i)
@@ -139,7 +139,17 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/Custo para sair do contrato atual/i)
     expect(page).toMatch(/exitCostCents/)
     expect(page).toMatch(/Custo de saída confirmado/i)
-    expect(page).toMatch(/inclui custos únicos e saída/i)
+    expect(page).toMatch(/inclui custos únicos, saída e (?:eventual )?sobreposição/i)
+  })
+
+  it('inclui uma sobreposição declarada quando os dois contratos são pagos em simultâneo', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Meses com ambos os contratos a pagar/i)
+    expect(page).toMatch(/proposalOverlapMonths/)
+    expect(page).toMatch(/overlapMonths/)
+    expect(page).toMatch(/Custo de sobreposição confirmado/i)
+    expect(page).toMatch(/não existe sobreposição/i)
   })
 
   it('exige uma validade declarada ou a ausência explícita desse facto antes de comparar', async () => {

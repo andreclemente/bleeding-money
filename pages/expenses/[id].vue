@@ -92,6 +92,7 @@ const parseEuros = (value: string) => {
 const proposalMonthlyCost = ref('')
 const proposalOneOffCost = ref('0')
 const proposalExitCost = ref('')
+const proposalOverlapMonths = ref('')
 const proposalValidUntil = ref('')
 const proposalValidityUndeclared = ref(false)
 const proposalCommitmentMonths = ref('12')
@@ -148,12 +149,14 @@ const compareProposal = () => {
     if (!proposalValidity.value.ready) throw new Error(proposalValidity.value.action)
     if (insuranceDetails.value && !insuranceProposalReadiness.value.ready) throw new Error(insuranceProposalReadiness.value.action)
     if (!/^\d+$/.test(proposalCommitmentMonths.value.trim())) throw new Error('Indica a duração em meses inteiros.')
+    if (!/^\d+$/.test(proposalOverlapMonths.value.trim())) throw new Error('Indica os meses de sobreposição, mesmo quando sejam zero.')
     if (proposalPricePath.value === 'changes' && !/^\d+$/.test(proposalIntroductoryMonths.value.trim())) throw new Error('Indica os meses ao preço inicial.')
     proposalComparison.value = compareContractProposal({
       currentMonthlyCents: data.value.expense.monthlyCostCents,
       proposedMonthlyCents: parseEuros(proposalMonthlyCost.value),
       oneOffCents: parseEuros(proposalOneOffCost.value),
       exitCostCents: parseEuros(proposalExitCost.value),
+      overlapMonths: Number(proposalOverlapMonths.value),
       commitmentMonths: Number(proposalCommitmentMonths.value),
       ...(proposalPricePath.value === 'changes' ? {
         introductoryMonths: Number(proposalIntroductoryMonths.value),
@@ -169,6 +172,7 @@ watch([
   proposalMonthlyCost,
   proposalOneOffCost,
   proposalExitCost,
+  proposalOverlapMonths,
   proposalCommitmentMonths,
   proposalIntroductoryMonths,
   proposalLaterMonthlyCost,
@@ -672,9 +676,9 @@ const saveAgenda = async () => {
                       v-model="proposalUpfrontCostsConfirmed"
                       type="checkbox"
                     >
-                    <span>Custos únicos e custo de saída confirmados</span>
+                    <span>Custos únicos, saída e sobreposição confirmados</span>
                   </label>
-                  <small>Confirma os dois valores no documento ou junto do fornecedor, mesmo quando sejam zero.</small>
+                  <small>Confirma os dois valores e os meses de sobreposição no documento ou junto do fornecedor, mesmo quando sejam zero.</small>
                   <div class="proposal-price-path">
                     <strong>Trajetória do preço durante o período comparado</strong>
                     <p>Escolhe apenas o que confirmaste na proposta escrita.</p>
@@ -824,6 +828,17 @@ const saveAgenda = async () => {
                   ><span>EUR</span>
                 </div>
                 <small>Indica 0 apenas se confirmaste que não existe penalização ou valor pendente.</small>
+                <label for="proposal-overlap-months">Meses com ambos os contratos a pagar</label>
+                <div class="proposal-comparison__months">
+                  <input
+                    id="proposal-overlap-months"
+                    v-model="proposalOverlapMonths"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="0"
+                  ><span>meses</span>
+                </div>
+                <small>Indica 0 apenas se confirmaste que não existe sobreposição entre cobranças.</small>
                 <label for="proposal-commitment-months">Período comparado</label>
                 <div class="proposal-comparison__months">
                   <input
@@ -865,7 +880,8 @@ const saveAgenda = async () => {
                     <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
                     <div><dt>Validade da proposta</dt><dd>{{ proposalValidity.validUntil ? `${date(proposalValidity.validUntil)} · ${proposalValidity.label}` : proposalValidity.label }}</dd></div>
                     <div><dt>Custo de saída confirmado</dt><dd>{{ money(proposalComparison.exitCostCents || 0) }}</dd></div>
-                    <div><dt>Custo no 1.º mês</dt><dd>{{ money(proposalComparison.firstMonthCents) }} · inclui custos únicos e saída</dd></div>
+                    <div><dt>Custo de sobreposição confirmado</dt><dd>{{ money(proposalComparison.overlapCostCents || 0) }} · {{ proposalComparison.overlapMonths }} meses</dd></div>
+                    <div><dt>Custo no 1.º mês</dt><dd>{{ money(proposalComparison.firstMonthCents) }} · inclui custos únicos, saída e eventual sobreposição</dd></div>
                     <div v-if="proposalComparison.introductoryMonths">
                       <dt>Preço inicial</dt><dd>{{ money(proposalComparison.proposedMonthlyCents) }} × {{ proposalComparison.introductoryMonths }} meses</dd>
                     </div>
@@ -876,7 +892,7 @@ const saveAgenda = async () => {
                       <dt>Custo anual depois da promoção</dt><dd>{{ money(proposalComparison.laterAnnualCents) }} · {{ proposalLaterAnnualDifference }}</dd>
                     </div>
                     <div>
-                      <dt>Custo nos primeiros {{ proposalComparison.firstPeriodMonths }} meses</dt><dd>{{ money(proposalComparison.firstPeriodCents) }} · inclui custos únicos e saída · {{ proposalFirstPeriodDifference }}</dd>
+                      <dt>Custo nos primeiros {{ proposalComparison.firstPeriodMonths }} meses</dt><dd>{{ money(proposalComparison.firstPeriodCents) }} · inclui custos únicos, saída e sobreposição · {{ proposalFirstPeriodDifference }}</dd>
                     </div>
                     <div><dt>Total no período</dt><dd>{{ money(proposalComparison.proposedPeriodCents) }}</dd></div>
                     <div><dt>Equivalente mensal da proposta</dt><dd>{{ money(proposalComparison.proposedMonthlyEquivalentCents) }}</dd></div>

@@ -51,6 +51,8 @@ export type ContractProposalComparison = {
   proposedMonthlyCents: number
   oneOffCents: number
   exitCostCents?: number
+  overlapMonths?: number
+  overlapCostCents?: number
   commitmentMonths: number
   currentPeriodCents: number
   proposedPeriodCents: number
@@ -226,8 +228,8 @@ export const buildContractProposalReadiness = (input: {
     },
     {
       confirmed: input.upfrontCostsConfirmed,
-      label: 'Custos únicos e custo de saída confirmados',
-      action: 'Confirma os custos únicos da proposta e o custo para sair do contrato atual, mesmo quando sejam zero.'
+      label: 'Custos únicos, saída e sobreposição confirmados',
+      action: 'Confirma os custos únicos, o custo para sair e os meses com ambos os contratos a pagar, mesmo quando sejam zero.'
     },
     {
       confirmed: input.pricePath !== null,
@@ -377,6 +379,7 @@ export const compareContractProposal = (input: {
   proposedMonthlyCents: number
   oneOffCents: number
   exitCostCents?: number
+  overlapMonths?: number
   commitmentMonths: number
   introductoryMonths?: number
   laterMonthlyCents?: number
@@ -385,6 +388,8 @@ export const compareContractProposal = (input: {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('Valor monetário inválido.')
   }
   if (!Number.isSafeInteger(input.commitmentMonths) || input.commitmentMonths < 1 || input.commitmentMonths > 120) throw new Error('Duração inválida.')
+  const overlapMonths = input.overlapMonths ?? 0
+  if (!Number.isSafeInteger(overlapMonths) || overlapMonths < 0 || overlapMonths > input.commitmentMonths) throw new Error('Sobreposição inválida.')
 
   const hasPhasedPrice = input.introductoryMonths !== undefined || input.laterMonthlyCents !== undefined
   if (hasPhasedPrice && input.laterMonthlyCents === undefined) throw new Error('Indica o preço posterior à promoção.')
@@ -395,14 +400,16 @@ export const compareContractProposal = (input: {
   const currentPeriodCents = input.currentMonthlyCents * input.commitmentMonths
   const exitCostCents = input.exitCostCents ?? 0
   const upfrontCostCents = input.oneOffCents + exitCostCents
+  const overlapCostCents = input.currentMonthlyCents * overlapMonths
   if (!Number.isSafeInteger(upfrontCostCents)) throw new Error('Valor monetário inválido.')
+  if (!Number.isSafeInteger(overlapCostCents)) throw new Error('Valor monetário inválido.')
   const laterPeriodMonths = hasPhasedPrice ? input.commitmentMonths - input.introductoryMonths! : 0
   const proposedRecurringPeriodCents = hasPhasedPrice
     ? input.proposedMonthlyCents * input.introductoryMonths! + input.laterMonthlyCents! * laterPeriodMonths
     : input.proposedMonthlyCents * input.commitmentMonths
-  const proposedPeriodCents = proposedRecurringPeriodCents + upfrontCostCents
+  const proposedPeriodCents = proposedRecurringPeriodCents + upfrontCostCents + overlapCostCents
   if (!Number.isSafeInteger(currentPeriodCents) || !Number.isSafeInteger(proposedPeriodCents)) throw new Error('Valor monetário inválido.')
-  const firstMonthCents = input.proposedMonthlyCents + upfrontCostCents
+  const firstMonthCents = input.proposedMonthlyCents + upfrontCostCents + (overlapMonths > 0 ? input.currentMonthlyCents : 0)
   const firstMonthDifferenceCents = input.currentMonthlyCents - firstMonthCents
   if (!Number.isSafeInteger(firstMonthCents) || !Number.isSafeInteger(firstMonthDifferenceCents)) throw new Error('Valor monetário inválido.')
   const recurringDifferenceCents = input.currentMonthlyCents - input.proposedMonthlyCents
@@ -415,44 +422,47 @@ export const compareContractProposal = (input: {
     throw new Error('Valor monetário inválido.')
   }
   const accumulatedAdvantageAtPromotionEndCents = hasPhasedPrice
-    ? (input.currentMonthlyCents - input.proposedMonthlyCents) * input.introductoryMonths! - upfrontCostCents
+    ? (input.currentMonthlyCents - input.proposedMonthlyCents) * input.introductoryMonths! - upfrontCostCents - input.currentMonthlyCents * Math.min(overlapMonths, input.introductoryMonths!)
     : undefined
   if (accumulatedAdvantageAtPromotionEndCents !== undefined && !Number.isSafeInteger(accumulatedAdvantageAtPromotionEndCents)) throw new Error('Valor monetário inválido.')
   const firstPeriodMonths = Math.min(12, input.commitmentMonths)
   const firstIntroductoryMonths = hasPhasedPrice ? Math.min(input.introductoryMonths!, firstPeriodMonths) : firstPeriodMonths
   const firstLaterMonths = firstPeriodMonths - firstIntroductoryMonths
   const firstPeriodCents = upfrontCostCents
+    + input.currentMonthlyCents * Math.min(overlapMonths, firstPeriodMonths)
     + input.proposedMonthlyCents * firstIntroductoryMonths
     + (hasPhasedPrice ? input.laterMonthlyCents! * firstLaterMonths : 0)
   const firstPeriodDifferenceCents = input.currentMonthlyCents * firstPeriodMonths - firstPeriodCents
   if (!Number.isSafeInteger(firstPeriodCents) || !Number.isSafeInteger(firstPeriodDifferenceCents)) throw new Error('Valor monetário inválido.')
   const priceLimitAvailableCents = hasPhasedPrice
-    ? currentPeriodCents - upfrontCostCents - input.proposedMonthlyCents * input.introductoryMonths!
-    : currentPeriodCents - upfrontCostCents
+    ? currentPeriodCents - upfrontCostCents - overlapCostCents - input.proposedMonthlyCents * input.introductoryMonths!
+    : currentPeriodCents - upfrontCostCents - overlapCostCents
   if (!Number.isSafeInteger(priceLimitAvailableCents)) throw new Error('Valor monetário inválido.')
   const priceLimitMonths = hasPhasedPrice ? laterPeriodMonths : input.commitmentMonths
   const maximumMonthlyCentsForNoIncrease = priceLimitAvailableCents < 0
     ? null
     : Math.floor(priceLimitAvailableCents / priceLimitMonths)
   const periodDifferenceCents = currentPeriodCents - proposedPeriodCents
-  let breakEvenMonth: number | null = upfrontCostCents === 0 && input.proposedMonthlyCents < input.currentMonthlyCents ? 0 : null
+  let breakEvenMonth: number | null = upfrontCostCents === 0 && overlapMonths === 0 && input.proposedMonthlyCents < input.currentMonthlyCents ? 0 : null
   let accumulatedAdvantageExhaustedMonth: number | null = null
   let accumulatedDifferenceCents = -upfrontCostCents
   for (let month = 1; breakEvenMonth === null && month <= input.commitmentMonths; month += 1) {
     const proposedMonthlyCents = hasPhasedPrice && month > input.introductoryMonths! ? input.laterMonthlyCents! : input.proposedMonthlyCents
-    accumulatedDifferenceCents += input.currentMonthlyCents - proposedMonthlyCents
-    if (accumulatedDifferenceCents >= 0 && (upfrontCostCents > 0 || accumulatedDifferenceCents > 0)) breakEvenMonth = month
+    const overlappingCurrentCents = month <= overlapMonths ? input.currentMonthlyCents : 0
+    accumulatedDifferenceCents += input.currentMonthlyCents - proposedMonthlyCents - overlappingCurrentCents
+    if (accumulatedDifferenceCents >= 0 && (upfrontCostCents > 0 || overlapMonths > 0 || accumulatedDifferenceCents > 0)) breakEvenMonth = month
   }
   if (hasPhasedPrice && laterRecurringDifferenceCents! < 0 && accumulatedAdvantageAtPromotionEndCents! > 0) {
     accumulatedDifferenceCents = accumulatedAdvantageAtPromotionEndCents!
     for (let month = input.introductoryMonths! + 1; accumulatedAdvantageExhaustedMonth === null && month <= input.commitmentMonths; month += 1) {
-      accumulatedDifferenceCents += laterRecurringDifferenceCents!
+      accumulatedDifferenceCents += laterRecurringDifferenceCents! - (month <= overlapMonths ? input.currentMonthlyCents : 0)
       if (accumulatedDifferenceCents <= 0) accumulatedAdvantageExhaustedMonth = month
     }
   }
 
   return {
     ...input,
+    ...(input.overlapMonths !== undefined ? { overlapMonths, overlapCostCents } : {}),
     ...(hasPhasedPrice ? { laterPeriodMonths, laterRecurringDifferenceCents, laterAnnualCents, laterAnnualDifferenceCents, accumulatedAdvantageAtPromotionEndCents, accumulatedAdvantageExhaustedMonth } : {}),
     currentPeriodCents,
     proposedPeriodCents,
@@ -548,6 +558,7 @@ export const buildContractProposalActionNote = (comparison: ContractProposalComp
     ...priceLines,
     `Custo único declarado: ${euros(comparison.oneOffCents)}`,
     ...(comparison.exitCostCents !== undefined ? [`Custo de saída confirmado: ${euros(comparison.exitCostCents)}`] : []),
+    ...(comparison.overlapMonths !== undefined ? [`Sobreposição confirmada: ${comparison.overlapMonths} meses · ${euros(comparison.overlapCostCents ?? 0)}`] : []),
     ...(validity?.validUntil ? [`Validade declarada: ${formatCivilDate(validity.validUntil)} · ${validity.label}`] : validity?.status === 'undeclared' ? ['Validade: não declarada no documento'] : []),
     `Período comparado: ${comparison.commitmentMonths} meses`,
     `Custo total declarado: ${euros(comparison.proposedPeriodCents)}`,
