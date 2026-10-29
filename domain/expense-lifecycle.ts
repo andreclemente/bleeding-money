@@ -85,6 +85,11 @@ export type ContractProposalDecision = {
   rule: string
 }
 
+export type ContractProposalIdentity = {
+  provider: string
+  product: string
+}
+
 export type InsuranceProposalReadiness = {
   ready: boolean
   missing: string[]
@@ -544,7 +549,7 @@ export const buildContractProposalDecision = (comparison: ContractProposalCompar
   }
 }
 
-export const buildContractProposalActionNote = (comparison: ContractProposalComparison, validity?: ContractProposalValidity) => {
+export const buildContractProposalActionNote = (comparison: ContractProposalComparison, validity?: ContractProposalValidity, identity?: ContractProposalIdentity) => {
   const decision = buildContractProposalDecision(comparison, validity)
   const priceLines = comparison.introductoryMonths === undefined
     ? [`Mensalidade declarada: ${euros(comparison.proposedMonthlyCents)}`]
@@ -555,6 +560,7 @@ export const buildContractProposalActionNote = (comparison: ContractProposalComp
 
   return [
     'Proposta em análise',
+    ...(identity ? [`Fornecedor e plano declarados: ${identity.provider} · ${identity.product}`] : []),
     ...priceLines,
     `Custo único declarado: ${euros(comparison.oneOffCents)}`,
     ...(comparison.exitCostCents !== undefined ? [`Custo de saída confirmado: ${euros(comparison.exitCostCents)}`] : []),

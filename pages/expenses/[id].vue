@@ -95,6 +95,12 @@ const parseEuros = (value: string) => {
   return cents
 }
 const proposalMonthlyCost = ref('')
+const proposalProvider = ref('')
+const proposalProduct = ref('')
+const proposalIdentity = computed(() => ({
+  provider: proposalProvider.value.trim(),
+  product: proposalProduct.value.trim()
+}))
 const proposalOneOffCost = ref('0')
 const proposalExitCost = ref('')
 const proposalOverlapMonths = ref('')
@@ -147,7 +153,7 @@ watch(proposalSavingFindings, (findings: SavingsFinding[]) => {
 const copyProposalAction = async () => {
   if (!proposalComparison.value) return
   try {
-    await navigator.clipboard.writeText(buildContractProposalActionNote(proposalComparison.value, proposalValidity.value))
+    await navigator.clipboard.writeText(buildContractProposalActionNote(proposalComparison.value, proposalValidity.value, proposalIdentity.value))
     proposalActionStatus.value = 'Próxima ação copiada com os valores declarados.'
   } catch {
     proposalActionStatus.value = 'Não foi possível copiar a próxima ação.'
@@ -190,6 +196,8 @@ const compareProposal = () => {
   proposalComparisonStatus.value = ''
   proposalComparison.value = null
   try {
+    if (!proposalIdentity.value.provider) throw new Error('Indica o fornecedor que apresentou a proposta.')
+    if (!proposalIdentity.value.product) throw new Error('Indica o plano ou a referência da proposta.')
     if (!proposalReadiness.value.ready) throw new Error(proposalReadiness.value.action)
     if (!proposalValidity.value.ready) throw new Error(proposalValidity.value.action)
     if (insuranceDetails.value && !insuranceProposalReadiness.value.ready) throw new Error(insuranceProposalReadiness.value.action)
@@ -214,6 +222,8 @@ const compareProposal = () => {
 }
 watch([
   currentMonthlyCostForComparison,
+  proposalProvider,
+  proposalProduct,
   proposalMonthlyCost,
   proposalOneOffCost,
   proposalExitCost,
@@ -721,6 +731,27 @@ const saveAgenda = async () => {
                 <span>Comparar proposta recebida</span>
                 <p>Compara a proposta declarada com o cenário em que o custo atual não muda. A proposta fica em análise: não é aceite, não altera o contrato e não é uma poupança confirmada.</p>
                 <fieldset class="insurance-proposal-readiness">
+                  <legend>Identificar proposta</legend>
+                  <p>Associa os valores ao fornecedor e ao plano exatos para a comparação continuar auditável quando for copiada.</p>
+                  <label for="proposal-provider">Fornecedor proposto</label>
+                  <input
+                    id="proposal-provider"
+                    v-model="proposalProvider"
+                    type="text"
+                    autocomplete="organization"
+                    placeholder="Nome do fornecedor"
+                  >
+                  <label for="proposal-product">Plano ou referência da proposta</label>
+                  <input
+                    id="proposal-product"
+                    v-model="proposalProduct"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="Plano, pacote ou referência"
+                  >
+                  <small>Estes nomes identificam a proposta em análise; não significam que foi aceite.</small>
+                </fieldset>
+                <fieldset class="insurance-proposal-readiness">
                   <legend>Factos confirmados na proposta</legend>
                   <p>Assinala apenas o que confirmaste na proposta escrita. Os números ficam bloqueados enquanto faltar contexto essencial.</p>
                   <label>
@@ -924,7 +955,7 @@ const saveAgenda = async () => {
                 <button
                   class="secondary-action"
                   type="submit"
-                  :disabled="!proposalReadiness.ready || !proposalValidity.ready || (Boolean(insuranceDetails) && !insuranceProposalReadiness.ready)"
+                  :disabled="!proposalIdentity.provider || !proposalIdentity.product || !proposalReadiness.ready || !proposalValidity.ready || (Boolean(insuranceDetails) && !insuranceProposalReadiness.ready)"
                 >
                   Comparar custo total
                 </button>
@@ -964,6 +995,7 @@ const saveAgenda = async () => {
                 >
                   <strong>Proposta em análise</strong>
                   <dl>
+                    <div><dt>Fornecedor e plano declarados</dt><dd>{{ proposalIdentity.provider }} · {{ proposalIdentity.product }}</dd></div>
                     <div><dt>Atual, se não mudar</dt><dd>{{ money(proposalComparison.currentPeriodCents) }}</dd></div>
                     <div><dt>Validade da proposta</dt><dd>{{ proposalValidity.validUntil ? `${date(proposalValidity.validUntil)} · ${proposalValidity.label}` : proposalValidity.label }}</dd></div>
                     <div><dt>Custo de saída confirmado</dt><dd>{{ money(proposalComparison.exitCostCents || 0) }}</dd></div>

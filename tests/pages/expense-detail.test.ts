@@ -125,6 +125,18 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/não é uma poupança confirmada/i)
   })
 
+  it('identifica o fornecedor e o plano antes de comparar ou copiar uma proposta', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Identificar proposta/i)
+    expect(page).toMatch(/Fornecedor proposto/i)
+    expect(page).toMatch(/Plano ou referência da proposta/i)
+    expect(page).toMatch(/proposalProvider/)
+    expect(page).toMatch(/proposalProduct/)
+    expect(page).toMatch(/Fornecedor e plano declarados/i)
+    expect(page).toMatch(/buildContractProposalActionNote\(proposalComparison\.value, proposalValidity\.value, proposalIdentity\.value\)/)
+  })
+
   it('exige factos essenciais da proposta antes de comparar os números', async () => {
     const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
 
