@@ -6,6 +6,7 @@ import { computed, defineComponent, h, reactive, ref, Suspense, watch } from 'vu
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FindingsPage from '../../pages/findings.vue'
 import type { RecurringExpense, SavingsFinding } from '../../domain/types'
+import type { FamilyRoute } from '../../domain/family-route'
 
 const finding: SavingsFinding = {
   id: 'finding-1',
@@ -65,13 +66,14 @@ interface StoreStub {
   findings: SavingsFinding[]
   expenses: RecurringExpense[]
   loading: boolean
+  dashboard: FamilyRoute | null
   refresh: ReturnType<typeof vi.fn>
   resolve: ReturnType<typeof vi.fn>
   dismiss: ReturnType<typeof vi.fn>
 }
 
 let store: StoreStub
-let route: ReturnType<typeof reactive>
+let route: { query: Record<string, string> }
 let routerReplace: ReturnType<typeof vi.fn>
 
 const mountPage = async () => {
@@ -96,6 +98,7 @@ beforeEach(() => {
     findings: [finding],
     expenses: [expense],
     loading: false,
+    dashboard: null,
     refresh: vi.fn().mockResolvedValue(undefined),
     resolve: vi.fn().mockResolvedValue(undefined),
     dismiss: vi.fn().mockResolvedValue(undefined)
@@ -172,5 +175,25 @@ describe('pages/findings', () => {
     await flushPromises()
 
     expect(store.resolve).toHaveBeenCalledWith(finding.id, 3397, '2026-09-12')
+  })
+
+  it('mantém um arquivo que separa reduções comprovadas de casos encerrados sem alteração', async () => {
+    const resolved = { ...finding, id: 'resolved-1', status: 'resolved' as const, resolvedAt: '2026-09-12T10:00:00.000Z' }
+    const dismissed = { ...finding, id: 'dismissed-1', title: 'Rever cobertura', status: 'dismissed' as const, dismissedAt: '2026-09-11T10:00:00.000Z' }
+    store.findings = [resolved, dismissed]
+    store.dashboard = {
+      decisions: [{ id: 'action-1', findingId: resolved.id, previousCostCents: 4899, newCostCents: 3397, actionDate: '2026-09-12', annualSavingCents: 18024, createdAt: '2026-09-12T10:00:00.000Z' }]
+    } as FamilyRoute
+    route.query = { vista: 'prioritarias' }
+
+    const wrapper = await mountPage()
+
+    expect(wrapper.text()).toContain('Arquivo auditável')
+    expect(wrapper.text()).toContain('Redução confirmada')
+    expect(wrapper.text()).toContain('180,24')
+    expect(wrapper.text()).toContain('48,99')
+    expect(wrapper.text()).toContain('33,97')
+    expect(wrapper.text()).toContain('Encerrado sem alteração')
+    expect(wrapper.text()).toContain('não entra no objetivo')
   })
 })

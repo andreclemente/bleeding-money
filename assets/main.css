@@ -198,6 +198,18 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .findings-summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 22px; border: 1px solid var(--bm-border); border-radius: var(--bm-radius); background: var(--bm-surface) }
 .findings-summary strong { font-size: 1.08rem }
 .findings-summary p { margin: 3px 0 0; color: var(--bm-muted); font-size: .82rem }
+.decision-archive { margin-top: 2rem }
+.decision-archive .section-heading { margin-bottom: .8rem }
+.decision-archive__list { display: grid; margin: 0; padding: 0; border: 1px solid var(--bm-border); border-radius: var(--bm-radius); background: var(--bm-surface); list-style: none }
+.decision-archive__item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.5rem; align-items: center; padding: 1rem 1.2rem; border-bottom: 1px solid var(--bm-border); border-left: 3px solid var(--bm-muted) }
+.decision-archive__item:last-child { border-bottom: 0 }
+.decision-archive__item--confirmed { border-left-color: var(--bm-success) }
+.decision-archive__item>div:first-child { display: grid; gap: .25rem }
+.decision-archive__item>div:first-child>span { color: var(--bm-muted); font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase }
+.decision-archive__item>div:first-child>strong { font-size: .92rem }
+.decision-archive__item small { color: var(--bm-muted); font-size: .72rem; line-height: 1.4 }
+.decision-archive__result { display: grid; gap: .2rem; text-align: right }
+.decision-archive__result strong { color: var(--bm-primary); font-size: .9rem }
 
 .dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 25px 25px 0 }
 .dialog-title { margin: 6px 0 0; font-size: 1.55rem }
@@ -412,6 +424,8 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
   .dialog-header, .dialog-content { padding-left: 18px !important; padding-right: 18px !important }
   .dialog-actions { padding: 0 18px 18px !important }
   .findings-summary { align-items: flex-start; flex-direction: column }
+  .decision-archive__item { grid-template-columns: 1fr; gap: .8rem }
+  .decision-archive__result { text-align: left }
 }
 
 .workspace-label { margin: .45rem 0 0 47px; color: var(--bm-muted); font-size: .7rem }

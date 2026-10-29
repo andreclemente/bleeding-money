@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RecurringExpense, SavingsFinding } from '../domain/types'
+import type { RecurringExpense, SavingAction, SavingsFinding } from '../domain/types'
 
 const store = useSavingsStore()
 await callOnce(() => store.refresh())
@@ -18,8 +18,19 @@ const money = (cents: number) => new Intl.NumberFormat('pt-PT', {
 const current = computed(() => store.findings.find((item: SavingsFinding) => item.id === selected.value))
 const currentExpense = computed(() => store.expenses.find((item: RecurringExpense) => item.id === current.value?.expenseId))
 const openFindings = computed<SavingsFinding[]>(() => store.findings.filter((item: SavingsFinding) => item.status === 'open'))
+const closedFindings = computed<SavingsFinding[]>(() => store.findings
+  .filter((item: SavingsFinding) => item.status !== 'open')
+  .sort((left: SavingsFinding, right: SavingsFinding) => {
+    const leftDate = left.resolvedAt || left.dismissedAt || left.createdAt
+    const rightDate = right.resolvedAt || right.dismissedAt || right.createdAt
+    return rightDate.localeCompare(leftDate) || left.id.localeCompare(right.id)
+  }))
 const potentialTotal = computed(() => openFindings.value.reduce((total: number, item: SavingsFinding) => total + item.estimatedMonthlySavingMaxCents, 0))
 const hasEstimatedSaving = (finding: SavingsFinding) => finding.estimatedMonthlySavingMinCents > 0 || finding.estimatedMonthlySavingMaxCents > 0
+const expenseFor = (finding: SavingsFinding) => store.expenses.find((item: RecurringExpense) => item.id === finding.expenseId)
+const decisionFor = (finding: SavingsFinding) => store.dashboard?.decisions.find((decision: SavingAction) => decision.findingId === finding.id)
+const closedAt = (finding: SavingsFinding) => finding.resolvedAt || finding.dismissedAt || finding.createdAt
+const shortDate = (value: string) => new Intl.DateTimeFormat('pt-PT', { dateStyle: 'medium' }).format(new Date(value))
 
 watch(() => route.query.open, (value: unknown) => {
   selected.value = typeof value === 'string' ? value : null
@@ -178,6 +189,48 @@ const dismiss = async () => {
           </v-btn>
         </div>
       </div>
+
+      <section
+        v-if="closedFindings.length"
+        class="decision-archive"
+        aria-labelledby="decision-archive-heading"
+      >
+        <div class="section-heading">
+          <div>
+            <div class="data-label">
+              Rasto de decisões
+            </div>
+            <h2 id="decision-archive-heading">
+              Arquivo auditável
+            </h2>
+            <p>Separa reduções comprovadas de casos encerrados sem alteração.</p>
+          </div>
+        </div>
+        <ol class="decision-archive__list">
+          <li
+            v-for="finding in closedFindings"
+            :key="finding.id"
+            class="decision-archive__item"
+            :class="{ 'decision-archive__item--confirmed': finding.status === 'resolved' }"
+          >
+            <div>
+              <span>{{ finding.status === 'resolved' ? 'Redução confirmada' : 'Encerrado sem alteração' }}</span>
+              <strong>{{ finding.title }}</strong>
+              <small>{{ expenseFor(finding)?.productName || 'Contrato' }} · {{ expenseFor(finding)?.provider || 'Fornecedor não disponível' }} · {{ shortDate(closedAt(finding)) }}</small>
+            </div>
+            <div class="decision-archive__result">
+              <template v-if="decisionFor(finding)">
+                <strong>{{ money(decisionFor(finding)!.annualSavingCents) }}/ano</strong>
+                <small>{{ money(decisionFor(finding)!.previousCostCents) }} → {{ money(decisionFor(finding)!.newCostCents) }}/mês</small>
+              </template>
+              <template v-else>
+                <strong>Sem redução registada</strong>
+                <small>não entra no objetivo</small>
+              </template>
+            </div>
+          </li>
+        </ol>
+      </section>
     </template>
 
     <RecommendationDetailDialog
