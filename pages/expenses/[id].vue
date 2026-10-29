@@ -124,6 +124,7 @@ const insuranceProposalReadiness = computed(() => buildInsuranceProposalReadines
 }))
 const proposalError = ref('')
 const proposalComparison = ref<ReturnType<typeof compareContractProposal> | null>(null)
+const currentMonthlyCostForComparison = computed(() => data.value?.expense.monthlyCostCents ?? null)
 const proposalDecision = computed(() => proposalComparison.value ? buildContractProposalDecision(proposalComparison.value, proposalValidity.value) : null)
 const proposalActionStatus = ref('')
 const proposalComparisonStatus = ref('')
@@ -164,6 +165,7 @@ const compareProposal = () => {
   }
 }
 watch([
+  currentMonthlyCostForComparison,
   proposalMonthlyCost,
   proposalOneOffCost,
   proposalExitCost,
@@ -185,7 +187,7 @@ watch([
   proposalComparison.value = null
   proposalActionStatus.value = ''
   proposalError.value = ''
-  if (hadComparison) proposalComparisonStatus.value = 'Valores alterados. Volta a comparar antes de usar estes resultados.'
+  if (hadComparison) proposalComparisonStatus.value = 'Custo atual ou valores da proposta alterados. Volta a comparar antes de usar estes resultados.'
 })
 const proposalOutcome = computed(() => {
   const comparison = proposalComparison.value
