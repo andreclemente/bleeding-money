@@ -54,4 +54,15 @@ describe('Hoje', () => {
     expect(page).toContain('contrato, fatura ou aviso do fornecedor')
     expect(page).toContain('?edit=agenda')
   })
+
+  it('mostra o contrato e o custo anterior para tornar cada confirmação auditável', async () => {
+    const page = await readFile(new URL('../../pages/dashboard.vue', import.meta.url), 'utf8')
+
+    expect(page).toContain('decision.provider')
+    expect(page).toContain('decision.productName')
+    expect(page).toContain('decision.previousCostCents')
+    expect(page).toContain('decision.newCostCents')
+    expect(page).toContain('Custo observado')
+    expect(page).toContain(':to="`/expenses/${decision.expenseId}`"')
+  })
 })

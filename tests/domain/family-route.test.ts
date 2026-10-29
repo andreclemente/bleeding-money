@@ -180,6 +180,27 @@ describe('Rota Familiar', () => {
     expect(route.nextAction.kind).toBe('spending_limit_experiment')
   })
 
+  it('liga cada redução confirmada ao contrato e aos custos observados', () => {
+    const resolved = finding('resolved', 'contract', { status: 'resolved', resolvedAt: '2026-09-02T00:00:00.000Z' })
+    const actions: SavingAction[] = [{ id: 'action-1', findingId: resolved.id, previousCostCents: 4599, newCostCents: 3599, actionDate: '2026-09-02', annualSavingCents: 12000, createdAt: '2026-09-02T00:00:00.000Z' }]
+
+    const route = buildFamilyRoute({
+      civilDate: '2026-09-09',
+      expenses: [expense('contract', { provider: 'Operador', productName: 'Fibra Casa' })],
+      findings: [resolved],
+      actions,
+      periods: [],
+      goal: null
+    })
+
+    expect(route.decisions).toEqual([{
+      ...actions[0],
+      expenseId: 'contract',
+      provider: 'Operador',
+      productName: 'Fibra Casa'
+    }])
+  })
+
   it('prioriza renovação a 16-45 dias depois de casos estimados e antes de limites', () => {
     const renewal = expense('insurance', {
       category: 'insurance',

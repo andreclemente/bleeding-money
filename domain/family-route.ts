@@ -22,6 +22,12 @@ export interface FamilyAuditCase {
   monthlySavingMaxCents: number
 }
 
+export interface ConfirmedDecision extends SavingAction {
+  expenseId: string | null
+  provider: string | null
+  productName: string | null
+}
+
 export interface FamilyRouteInput {
   civilDate: string
   expenses: RecurringExpense[]
@@ -112,6 +118,17 @@ export const buildFamilyRoute = (input: FamilyRouteInput) => {
   const plan = latestPeriod ? calculateMoneyAtRisk(latestPeriod.amounts) : null
   const conditionalAnnualPlanCents = plan?.annualCents || 0
   const confirmedAnnualCents = input.actions.reduce((sum, action) => addMoney(sum, action.annualSavingCents), 0)
+  const findingById = new Map(input.findings.map(finding => [finding.id, finding]))
+  const decisions: ConfirmedDecision[] = input.actions.map(action => {
+    const finding = findingById.get(action.findingId)
+    const expense = finding ? expenseById.get(finding.expenseId) : undefined
+    return {
+      ...action,
+      expenseId: expense?.id || null,
+      provider: expense?.provider || null,
+      productName: expense?.productName || null
+    }
+  }).sort((left, right) => right.actionDate.localeCompare(left.actionDate) || left.id.localeCompare(right.id))
   const deadlines = buildContractRadar(input.expenses, input.civilDate)
   const agendaGaps = buildContractAgendaGapQueue(input.expenses, input.civilDate)
   const urgentDeadline = deadlines.find(item => item.daysUntil <= 15)
@@ -143,7 +160,7 @@ export const buildFamilyRoute = (input: FamilyRouteInput) => {
     conditionalAnnualPlanCents,
     lastUpdatedAt: [...input.expenses.map(item => item.updatedAt), ...input.periods.map(item => item.updatedAt)].sort().at(-1) || null,
     cases,
-    decisions: [...input.actions].sort((left, right) => right.actionDate.localeCompare(left.actionDate) || left.id.localeCompare(right.id)),
+    decisions,
     goal: input.goal
   }
 }

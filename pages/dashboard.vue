@@ -274,7 +274,24 @@ const shieldLabel = computed(() => shieldScore.value >= 75 ? 'Boa preparação' 
               v-for="decision in dashboard.decisions.slice(0, 4)"
               :key="decision.id"
             >
-              <span>{{ new Intl.DateTimeFormat('pt-PT').format(new Date(`${decision.actionDate}T12:00:00Z`)) }}</span><strong>{{ money(decision.annualSavingCents) }}/ano</strong>
+              <NuxtLink
+                v-if="decision.expenseId"
+                :to="`/expenses/${decision.expenseId}`"
+              >
+                <span class="decision-copy">
+                  <small>{{ decision.provider }} · {{ new Intl.DateTimeFormat('pt-PT').format(new Date(`${decision.actionDate}T12:00:00Z`)) }}</small>
+                  <strong>{{ decision.productName }}</strong>
+                  <span>Custo observado: {{ money(decision.previousCostCents) }} → {{ money(decision.newCostCents) }}/mês</span>
+                </span>
+                <b>{{ money(decision.annualSavingCents) }}<small>/ano confirmado</small></b>
+              </NuxtLink>
+              <div
+                v-else
+                class="decision-orphan"
+              >
+                <span>Confirmação de {{ new Intl.DateTimeFormat('pt-PT').format(new Date(`${decision.actionDate}T12:00:00Z`)) }} · contrato já indisponível</span>
+                <strong>{{ money(decision.annualSavingCents) }}/ano</strong>
+              </div>
             </li>
           </ul>
           <div

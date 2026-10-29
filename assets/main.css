@@ -757,8 +757,15 @@ h1, h2 { font-family: inherit; font-weight: 400 }
 .case-copy strong { margin-top: 4px; font-size: .88rem }
 .audit-cases b { color: var(--bm-ink); font-size: .8rem; font-weight: 500; text-align: right; white-space: nowrap }
 .audit-cases b small { margin-top: 4px; color: var(--bm-muted); font-size: .65rem; font-weight: 400 }
-.decision-ledger li { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: 16px; padding: 8px; font-size: .8rem }
-.decision-ledger strong { color: var(--bm-success); font-weight: 500 }
+.decision-ledger li { min-height: 64px; font-size: .8rem }
+.decision-ledger a, .decision-orphan { display: flex; min-height: 88px; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 8px; text-decoration: none }
+.decision-ledger a:hover { background: #e8e8e8 }
+.decision-copy { display: flex; min-width: 0; flex-direction: column; gap: 3px; color: var(--bm-muted) }
+.decision-copy small { font-size: .68rem }
+.decision-copy strong { overflow: hidden; color: var(--bm-ink); font-size: .86rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap }
+.decision-copy>span { color: var(--bm-muted); font-size: .72rem }
+.decision-ledger b, .decision-orphan strong { color: var(--bm-success); font-size: .8rem; font-weight: 600; text-align: right; white-space: nowrap }
+.decision-ledger b small { display: block; margin-top: 4px; color: var(--bm-muted); font-size: .62rem; font-weight: 400 }
 .ledger-empty, .decision-empty { padding: 24px 8px; border-bottom: 1px solid var(--bm-border); color: var(--bm-muted); font-size: .82rem; line-height: 1.5 }
 .decision-empty strong { color: var(--bm-ink); font-weight: 500 }
 .decision-empty p { margin: 6px 0 0; color: var(--bm-muted) }
@@ -858,7 +865,8 @@ h1, h2 { font-family: inherit; font-weight: 400 }
   .certainty-ledger>div, .contract-pulse>div { min-height: 96px; padding: 16px }
   .audit-cases a { grid-template-columns: 28px minmax(0, 1fr); align-items: start }
   .audit-cases b { grid-column: 2; text-align: left }
-  .decision-ledger li { align-items: flex-start; flex-direction: column }
+  .decision-ledger a, .decision-orphan { align-items: flex-start; flex-direction: column }
+  .decision-ledger b, .decision-orphan strong { text-align: left }
   .renewal-radar ol { border-top: 1px solid #f1c21b; border-left: 0 }
   .contract-row { grid-template-columns: 46px minmax(0, 1fr) auto; gap: 12px }
   .contract-date, .contract-status { grid-column: 2 }
