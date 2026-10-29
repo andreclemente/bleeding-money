@@ -256,6 +256,14 @@ h3 { color: var(--bm-ink); font-size: 1rem; font-weight: 600 }
 .observed-change-summary--increase>strong { color: var(--bm-danger) }
 .observed-change-summary--reduction { border-color: color-mix(in srgb, var(--bm-success) 28%, var(--bm-border)); background: var(--bm-success-soft) }
 .observed-change-summary--reduction>strong { color: var(--bm-success) }
+.confirmed-reductions { display: grid; gap: 14px; margin: 18px 24px 4px; padding: 18px; border: 1px solid color-mix(in srgb, var(--bm-success) 30%, var(--bm-border)); border-radius: 10px; background: var(--bm-success-soft) }
+.confirmed-reductions>div>span { color: var(--bm-success); font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em }
+.confirmed-reductions h3 { margin: 3px 0 0; font-size: 1rem }
+.confirmed-reductions ol { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none }
+.confirmed-reductions li { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(160px, 1.4fr) minmax(150px, 1fr) auto; gap: 12px; align-items: baseline; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--bm-success) 22%, var(--bm-border)) }
+.confirmed-reductions time,.confirmed-reductions li>span,.confirmed-reductions>small { color: var(--bm-muted); font-size: .72rem; line-height: 1.45 }
+.confirmed-reductions li>b { color: var(--bm-success); font-size: .78rem; text-align: right }
+@media (max-width: 760px) { .confirmed-reductions li { grid-template-columns: 1fr; gap: 3px } .confirmed-reductions li>b { text-align: left } }
 .expense-lifecycle { margin: 0; padding: 8px 24px 12px; list-style: none }
 .expense-lifecycle li { position: relative; display: grid; grid-template-columns: 18px 1fr; gap: 14px; padding: 18px 0 }
 .expense-lifecycle li:not(:last-child)::after { position: absolute; top: 31px; bottom: -13px; left: 6px; width: 1px; background: var(--bm-border); content: '' }

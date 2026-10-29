@@ -36,6 +36,7 @@ const expenseFrom = (row: Record<string, unknown>): RecurringExpense => ({ id: S
 const snapshotFrom = (row: Record<string, unknown>): ExpenseSnapshot => ({ id: String(row.id), expenseId: String(row.expense_id), observedAt: dateFrom(row.observed_at)!, priceCents: Number(row.price_cents), plan: row.plan === null ? undefined : String(row.plan), properties: (row.properties || {}) as Record<string, unknown>, source: String(row.source) })
 const observationFrom = (row: Record<string, unknown>): MarketObservation => ({ id: String(row.id), category: row.category as MarketObservation['category'], provider: String(row.provider), productType: String(row.product_type), attributes: row.attributes as MarketObservation['attributes'], monthlyPriceCents: Number(row.monthly_price_cents), negotiated: Boolean(row.negotiated), country: String(row.country), observedAt: dateFrom(row.observed_at)!, source: String(row.source), confidence: Number(row.confidence) })
 const findingFrom = (row: Record<string, unknown>): SavingsFinding => ({ id: String(row.id), expenseId: String(row.expense_id), type: row.type as SavingsFinding['type'], title: String(row.title), description: String(row.description), estimatedMonthlySavingMinCents: Number(row.estimated_monthly_saving_min_cents), estimatedMonthlySavingMaxCents: Number(row.estimated_monthly_saving_max_cents), estimatedAnnualSavingMinCents: Number(row.estimated_annual_saving_min_cents), estimatedAnnualSavingMaxCents: Number(row.estimated_annual_saving_max_cents), confidence: Number(row.confidence), severity: row.severity as SavingsFinding['severity'], priority: Number(row.priority), effort: row.effort as SavingsFinding['effort'], urgency: row.urgency as SavingsFinding['urgency'], action: String(row.action), evidence: row.evidence as string[], status: row.status as SavingsFinding['status'], createdAt: isoFrom(row.created_at), resolvedAt: row.resolved_at ? isoFrom(row.resolved_at) : undefined, dismissedAt: row.dismissed_at ? isoFrom(row.dismissed_at) : undefined })
+const actionFrom = (row: Record<string, unknown>): SavingAction => ({ id: String(row.id), findingId: String(row.finding_id), previousCostCents: Number(row.previous_cost_cents), newCostCents: Number(row.new_cost_cents), actionDate: dateFrom(row.action_date)!, annualSavingCents: Number(row.annual_saving_cents), createdAt: isoFrom(row.created_at) })
 const pgStoredError = () => new Error('Dados de gastos inválidos no PostgreSQL.')
 const pgEnum = <T extends string>(value: unknown, allowed: readonly T[]): T => {
   if (typeof value !== 'string' || !allowed.includes(value as T)) throw pgStoredError()
@@ -163,8 +164,12 @@ export class PostgresRepository implements PoupancasRepository {
   private async getExpenseWith(db: Queryable, userId: string, id: string) {
     const expenseRow = (await db.query(`${expenseSql} where e.user_id=$1 and e.id=$2`, [userId, id])).rows[0]
     if (!expenseRow) return null
-    const [snapshots, findings] = await Promise.all([db.query('select * from expense_snapshots where expense_id=$1 order by observed_at,created_at', [id]), db.query('select f.* from savings_findings f join recurring_expenses e on e.id=f.expense_id where e.user_id=$1 and f.expense_id=$2 order by f.priority desc', [userId, id])])
-    return { expense: expenseFrom(expenseRow), snapshots: snapshots.rows.map(snapshotFrom), findings: findings.rows.map(findingFrom) }
+    const [snapshots, findings, actions] = await Promise.all([
+      db.query('select * from expense_snapshots where expense_id=$1 order by observed_at,created_at', [id]),
+      db.query('select f.* from savings_findings f join recurring_expenses e on e.id=f.expense_id where e.user_id=$1 and f.expense_id=$2 order by f.priority desc', [userId, id]),
+      db.query('select a.* from saving_actions a join savings_findings f on f.id=a.finding_id join recurring_expenses e on e.id=f.expense_id where e.user_id=$1 and f.expense_id=$2 order by a.action_date desc,a.id', [userId, id])
+    ])
+    return { expense: expenseFrom(expenseRow), snapshots: snapshots.rows.map(snapshotFrom), findings: findings.rows.map(findingFrom), actions: actions.rows.map(actionFrom) }
   }
   private async writeDetails(db: Queryable, id: string, details: Exclude<ExpenseDetails, { kind: 'generic' }>, update = false) {
     if (details.kind === 'electricity') await db.query(`${update ? 'update electricity_details set contracted_power_kva=$2,tariff_type=$3,price_per_kwh_cents=$4,power_price_per_day_cents=$5,annual_consumption_kwh=$6,max_historical_power_kva=$7 where expense_id=$1' : 'insert into electricity_details (expense_id,contracted_power_kva,tariff_type,price_per_kwh_cents,power_price_per_day_cents,annual_consumption_kwh,max_historical_power_kva) values ($1,$2,$3,$4,$5,$6,$7)'}`, [id, details.contractedPowerKva, details.tariffType, details.pricePerKwhCents, details.powerPricePerDayCents, details.annualConsumptionKwh, details.maxHistoricalPowerKva])
@@ -320,7 +325,7 @@ export class PostgresRepository implements PoupancasRepository {
   }
   async listActions(userId: string) {
     const rows = (await this.pool.query('select a.* from saving_actions a join savings_findings f on f.id=a.finding_id join recurring_expenses e on e.id=f.expense_id where e.user_id=$1 order by a.action_date desc', [userId])).rows
-    return rows.map(row => ({ id: String(row.id), findingId: String(row.finding_id), previousCostCents: Number(row.previous_cost_cents), newCostCents: Number(row.new_cost_cents), actionDate: dateFrom(row.action_date)!, annualSavingCents: Number(row.annual_saving_cents), createdAt: isoFrom(row.created_at) }))
+    return rows.map(actionFrom)
   }
   async getHouseholdProfile(userId: string) {
     const row = (await this.pool.query('select * from household_profiles where user_id=$1', [userId])).rows[0]

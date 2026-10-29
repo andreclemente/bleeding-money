@@ -148,7 +148,7 @@ export const parseExpensePatchInput = (value: unknown): ExpensePatchInput => {
 
 export interface PoupancasRepository extends AuthRepository {
   listExpenses(userId: string): Promise<RecurringExpense[]>
-  getExpense(userId: string, id: string): Promise<{ expense: RecurringExpense, snapshots: ExpenseSnapshot[], findings: SavingsFinding[] } | null>
+  getExpense(userId: string, id: string): Promise<{ expense: RecurringExpense, snapshots: ExpenseSnapshot[], findings: SavingsFinding[], actions: SavingAction[] } | null>
   createExpense(userId: string, input: ExpenseInput): Promise<RecurringExpense>
   updateExpense(userId: string, id: string, input: ExpensePatchInput): Promise<RecurringExpense | null>
   listFindings(userId: string): Promise<SavingsFinding[]>
@@ -577,7 +577,14 @@ export class MemoryRepository implements PoupancasRepository {
   async getExpense(userId: string, id: string) {
     await this.refreshInsuranceFindings(userId)
     const expense = this.expenses.find(item => item.id === id && item.userId === userId)
-    return expense ? structuredClone({ expense, snapshots: this.snapshots.filter(item => item.expenseId === id), findings: this.findings.filter(item => item.expenseId === id) }) : null
+    if (!expense) return null
+    const findingIds = new Set(this.findings.filter(item => item.expenseId === id).map(item => item.id))
+    return structuredClone({
+      expense,
+      snapshots: this.snapshots.filter(item => item.expenseId === id),
+      findings: this.findings.filter(item => item.expenseId === id),
+      actions: this.actions.filter(item => findingIds.has(item.findingId)).sort((left, right) => right.actionDate.localeCompare(left.actionDate) || left.id.localeCompare(right.id))
+    })
   }
   private async generate(userId: string, expense: RecurringExpense, snapshots = this.snapshots, expenses = this.expenses, excludedTypes: SavingsFinding['type'][] = []) {
     const closedCycles = expense.category === 'insurance'

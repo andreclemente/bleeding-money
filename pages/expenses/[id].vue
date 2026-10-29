@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { buildContractAgendaPatch } from '../../domain/contract-agenda'
 import { buildContractCallGuide, buildContractDecisionDossier, buildContractDecisionSignal, buildContractProposalActionNote, buildContractProposalDecision, buildContractProposalReadiness, buildContractProposalValidity, buildExpenseLifecycle, buildInsuranceProposalReadiness, compareContractProposal } from '../../domain/expense-lifecycle'
-import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingsFinding } from '../../domain/types'
+import type { ExpenseCategory, ExpenseSnapshot, InsuranceCoverageCode, RecurringExpense, SavingAction, SavingsFinding } from '../../domain/types'
 
 const route = useRoute()
 const { data, pending, error: loadError, refresh } = await useFetch<{
   expense: RecurringExpense
   snapshots: ExpenseSnapshot[]
   findings: SavingsFinding[]
+  actions: SavingAction[]
 }>(`/api/expenses/${route.params.id}`)
 
 const money = (cents: number) => new Intl.NumberFormat('pt-PT', {
@@ -28,6 +29,10 @@ const categories: Record<ExpenseCategory, string> = {
   insurance: 'Seguro'
 }
 const openFindings = computed(() => data.value?.findings.filter(item => item.status === 'open') || [])
+const confirmedReductions = computed(() => data.value?.actions.map(action => ({
+  ...action,
+  title: data.value!.findings.find(finding => finding.id === action.findingId)?.title || 'Redução confirmada'
+})) || [])
 type InsuranceDetails = Extract<RecurringExpense['details'], { kind: 'insurance' }>
 const insuranceDetails = computed<InsuranceDetails | null>(() => data.value?.expense.details.kind === 'insurance' ? data.value.expense.details : null)
 const policyTypes = { car: 'Automóvel', home: 'Casa', health: 'Saúde', life: 'Vida', other: 'Outro' } as const
@@ -502,6 +507,30 @@ const saveAgenda = async () => {
             </p>
             <small>Resume apenas valores registados; não é uma previsão nem uma poupança confirmada.</small>
           </div>
+          <section
+            v-if="confirmedReductions.length"
+            class="confirmed-reductions"
+            aria-labelledby="confirmed-reductions-heading"
+          >
+            <div>
+              <span>Resultados comprovados</span>
+              <h3 id="confirmed-reductions-heading">
+                Reduções deste contrato
+              </h3>
+            </div>
+            <ol>
+              <li
+                v-for="action in confirmedReductions"
+                :key="action.id"
+              >
+                <time :datetime="action.actionDate">{{ date(action.actionDate) }}</time>
+                <strong>{{ action.title }}</strong>
+                <span>{{ money(action.previousCostCents) }} → {{ money(action.newCostCents) }}/mês</span>
+                <b>{{ money(action.annualSavingCents) }}/ano confirmado</b>
+              </li>
+            </ol>
+            <small>Mostra apenas custos inferiores já observados e ligados a uma recomendação concluída.</small>
+          </section>
           <ol
             v-if="lifecycle!.observations.length"
             class="expense-lifecycle"

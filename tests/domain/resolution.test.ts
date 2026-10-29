@@ -18,6 +18,7 @@ describe('fluxo de resolução', () => {
     const detail = await repo.getExpense(DEMO_USER_ID, '10000000-0000-4000-8000-000000000002')
     expect(detail?.expense.monthlyCostCents).toBe(3490)
     expect(detail?.snapshots.at(-1)).toMatchObject({ priceCents: 3490, source: 'saving_action' })
+    expect(detail?.actions).toEqual([expect.objectContaining({ findingId, previousCostCents: 4890, newCostCents: 3490, annualSavingCents: 16800 })])
     expect(await repo.listActions(DEMO_USER_ID)).toHaveLength(1)
     await expect(repo.resolveFinding(DEMO_USER_ID, findingId, 3000, '2026-09-07')).rejects.toThrow()
   })

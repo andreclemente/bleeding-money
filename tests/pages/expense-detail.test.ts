@@ -2,6 +2,17 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
 describe('detalhe do contrato', () => {
+  it('liga cada redução confirmada ao contrato, custo anterior e novo custo observado', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Reduções deste contrato/i)
+    expect(page).toContain('confirmedReductions')
+    expect(page).toContain('action.previousCostCents')
+    expect(page).toContain('action.newCostCents')
+    expect(page).toContain('action.annualSavingCents')
+    expect(page).toMatch(/apenas custos inferiores já observados/i)
+  })
+
   it('abre diretamente o editor de agenda quando a fila de contratos o pede', async () => {
     const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
 
