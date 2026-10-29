@@ -129,6 +129,16 @@ const currentMonthlyCostForComparison = computed(() => data.value?.expense.month
 const proposalDecision = computed(() => proposalComparison.value ? buildContractProposalDecision(proposalComparison.value, proposalValidity.value) : null)
 const proposalActionStatus = ref('')
 const proposalComparisonStatus = ref('')
+const proposalSavingFindings = computed<SavingsFinding[]>(() => openFindings.value.filter((item: SavingsFinding) => item.estimatedMonthlySavingMaxCents > 0))
+const proposalFindingId = ref('')
+const proposalObservedDate = ref(currentCivilDate)
+const proposalObservedOnInvoice = ref(false)
+const savingObservedProposal = ref(false)
+const proposalObservationError = ref('')
+const proposalObservationSuccess = ref('')
+watch(proposalSavingFindings, (findings: SavingsFinding[]) => {
+  if (!findings.some((item: SavingsFinding) => item.id === proposalFindingId.value)) proposalFindingId.value = findings[0]?.id || ''
+}, { immediate: true })
 const copyProposalAction = async () => {
   if (!proposalComparison.value) return
   try {
@@ -136,6 +146,34 @@ const copyProposalAction = async () => {
     proposalActionStatus.value = 'Próxima ação copiada com os valores declarados.'
   } catch {
     proposalActionStatus.value = 'Não foi possível copiar a próxima ação.'
+  }
+}
+const confirmObservedProposal = async () => {
+  if (!proposalComparison.value) return
+  proposalObservationError.value = ''
+  proposalObservationSuccess.value = ''
+  savingObservedProposal.value = true
+  try {
+    if (proposalPricePath.value !== 'stable') throw new Error('Um preço por fases não pode ser transformado numa redução anual constante.')
+    if (proposalComparison.value.outcome !== 'lower' || proposalComparison.value.proposedMonthlyCents >= proposalComparison.value.currentMonthlyCents) throw new Error('Só uma mensalidade real inferior pode confirmar uma redução.')
+    if (proposalValidity.value.status === 'expired') throw new Error('Pede uma proposta atualizada antes de confirmar a mudança.')
+    if (!proposalObservedOnInvoice.value) throw new Error('Confirma primeiro que a mensalidade já apareceu numa fatura ou extrato.')
+    if (!proposalSavingFindings.value.some((item: SavingsFinding) => item.id === proposalFindingId.value)) throw new Error('Escolhe uma recomendação de poupança ainda aberta.')
+    await $fetch(`/api/findings/${proposalFindingId.value}/resolve`, {
+      method: 'POST',
+      body: {
+        newCostCents: proposalComparison.value.proposedMonthlyCents,
+        actionDate: proposalObservedDate.value
+      }
+    })
+    await refresh()
+    await nextTick()
+    proposalObservedOnInvoice.value = false
+    proposalObservationSuccess.value = 'A mensalidade confirmada entrou na linha de vida e no objetivo como redução anual real.'
+  } catch (caught) {
+    proposalObservationError.value = (caught as { data?: { statusMessage?: string }, message?: string }).data?.statusMessage || (caught as Error).message
+  } finally {
+    savingObservedProposal.value = false
   }
 }
 const compareProposal = () => {
@@ -190,6 +228,9 @@ watch([
   const hadComparison = proposalComparison.value !== null
   proposalComparison.value = null
   proposalActionStatus.value = ''
+  proposalObservationError.value = ''
+  proposalObservationSuccess.value = ''
+  proposalObservedOnInvoice.value = false
   proposalError.value = ''
   if (hadComparison) proposalComparisonStatus.value = 'Custo atual ou valores da proposta alterados. Volta a comparar antes de usar estes resultados.'
 })
@@ -863,6 +904,20 @@ const saveAgenda = async () => {
                   {{ proposalComparisonStatus }}
                 </p>
                 <p
+                  v-if="proposalObservationSuccess"
+                  class="form-success"
+                  role="status"
+                >
+                  {{ proposalObservationSuccess }}
+                </p>
+                <p
+                  v-if="proposalObservationError"
+                  class="form-error"
+                  role="alert"
+                >
+                  {{ proposalObservationError }}
+                </p>
+                <p
                   v-if="proposalError"
                   class="form-error"
                   role="alert"
@@ -948,6 +1003,62 @@ const saveAgenda = async () => {
                     >
                       {{ proposalActionStatus }}
                     </p>
+                  </div>
+                  <div
+                    v-if="proposalPricePath === 'changes'"
+                    class="proposal-next-action proposal-next-action--verify"
+                  >
+                    <span>Confirmação de poupança</span>
+                    <strong>Preço por fases: mantém como cenário</strong>
+                    <p>Não transformamos o preço promocional numa redução anual constante. Regista e confirma cada novo custo real quando aparecer nas cobranças.</p>
+                  </div>
+                  <div
+                    v-else-if="proposalComparison.outcome === 'lower' && proposalSavingFindings.length"
+                    class="proposal-next-action proposal-next-action--verify"
+                  >
+                    <span>Fechar o ciclo com evidência</span>
+                    <strong>Confirmar mudança já faturada</strong>
+                    <p>Só avança depois de a nova mensalidade aparecer numa cobrança real. Nesse momento, a recomendação é concluída, a linha de vida recebe um snapshot e o objetivo usa a redução anual confirmada.</p>
+                    <label
+                      v-if="proposalSavingFindings.length > 1"
+                      for="proposal-finding"
+                    >Recomendação concluída</label>
+                    <select
+                      v-if="proposalSavingFindings.length > 1"
+                      id="proposal-finding"
+                      v-model="proposalFindingId"
+                    >
+                      <option
+                        v-for="finding in proposalSavingFindings"
+                        :key="finding.id"
+                        :value="finding.id"
+                      >
+                        {{ finding.title }}
+                      </option>
+                    </select>
+                    <label for="proposal-observed-date">Data da cobrança observada</label>
+                    <input
+                      id="proposal-observed-date"
+                      v-model="proposalObservedDate"
+                      type="date"
+                    >
+                    <label>
+                      <input
+                        v-model="proposalObservedOnInvoice"
+                        type="checkbox"
+                      >
+                      <span>Já confirmei esta mensalidade numa fatura ou extrato</span>
+                    </label>
+                    <v-btn
+                      type="button"
+                      color="primary"
+                      :loading="savingObservedProposal"
+                      :disabled="!proposalObservedOnInvoice || !proposalFindingId || !proposalObservedDate"
+                      @click="confirmObservedProposal"
+                    >
+                      Registar redução confirmada
+                    </v-btn>
+                    <small>Uma proposta aceite, sem cobrança observada, continua condicional e não entra no objetivo.</small>
                   </div>
                 </div>
               </form>

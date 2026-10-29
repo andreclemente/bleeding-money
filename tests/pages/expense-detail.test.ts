@@ -200,6 +200,20 @@ describe('detalhe do contrato', () => {
     expect(page).toMatch(/navigator\.clipboard\.writeText/)
   })
 
+  it('confirma no objetivo apenas uma proposta estável que já apareceu numa cobrança real', async () => {
+    const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toMatch(/Confirmar mudança já faturada/i)
+    expect(page).toMatch(/Já confirmei esta mensalidade numa fatura ou extrato/i)
+    expect(page).toMatch(/proposalObservedDate/)
+    expect(page).toMatch(/estimatedMonthlySavingMaxCents\s*>\s*0/)
+    expect(page).toMatch(/\/api\/findings\/\$\{proposalFindingId\.value\}\/resolve/)
+    expect(page).toMatch(/newCostCents:\s*proposalComparison\.value\.proposedMonthlyCents/)
+    expect(page).toMatch(/proposalPricePath\.value\s*!==\s*'stable'/)
+    expect(page).toMatch(/entrou na linha de vida e no objetivo/i)
+    expect(page).toMatch(/preço por fases/i)
+  })
+
   it('não calcula uma diferença de seguro antes de confirmar condições comparáveis', async () => {
     const page = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
 
