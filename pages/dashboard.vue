@@ -28,9 +28,13 @@ const actionView = computed(() => {
     const evidence = action.lastDeclaredDate ? ` Último prazo declarado: ${date(action.lastDeclaredDate)}.` : ''
     return { signal: action.label, title: `Confirmar agenda de ${item?.productName || 'contrato'}`, body: `${action.action}${evidence}`, why: 'Sem uma próxima data real, o produto não consegue avisar a família a tempo. Confirma no contrato, fatura ou aviso do fornecedor; não inventes uma data.', href: `/expenses/${action.expenseId}?edit=agenda`, cta: 'Confirmar data' }
   }
-  if (action.kind === 'estimated_finding' || action.kind === 'factual_finding') {
+  if (action.kind === 'estimated_finding') {
     const item = route.cases.find((item: FamilyAuditCase) => item.finding.id === action.findingId)
-    return { signal: action.kind === 'estimated_finding' ? 'Estimativa' : 'Facto', title: item?.finding.title || 'Rever caso', body: item?.finding.action || 'Confirma os dados antes de decidir.', why: action.kind === 'estimated_finding' ? 'É o caso aberto com maior prioridade e impacto identificável.' : 'Não há uma estimativa segura, mas existe um facto que merece revisão.', href: `/findings?open=${action.findingId}`, cta: 'Analisar caso' }
+    return { signal: 'Estimativa', title: item?.finding.title || 'Rever caso', body: item?.finding.action || 'Confirma os dados antes de decidir.', why: 'É o caso aberto com maior prioridade e impacto identificável. A sala do contrato mantém o custo atual, os prazos, a proposta e a confirmação final no mesmo contexto.', href: `/expenses/${action.expenseId}#decision-room`, cta: 'Preparar contrato' }
+  }
+  if (action.kind === 'factual_finding') {
+    const item = route.cases.find((item: FamilyAuditCase) => item.finding.id === action.findingId)
+    return { signal: 'Facto', title: item?.finding.title || 'Rever caso', body: item?.finding.action || 'Confirma os dados antes de decidir.', why: 'Não há uma estimativa segura, mas existe um facto que merece revisão.', href: `/findings?open=${action.findingId}`, cta: 'Analisar caso' }
   }
   if (action.kind === 'spending_limit_experiment') return { signal: 'Experiência', title: 'Testar o teu limite durante um mês', body: `${money(action.conditionalAnnualCents)} por ano é a equivalência do limite que escolheste — não uma redução confirmada.`, why: 'Não há contratos urgentes; esta é a próxima hipótese que podes validar com dados reais.', href: '/spending', cta: 'Abrir registo mensal' }
   if (action.kind === 'define_goal') return { signal: 'Destino', title: 'Dar um destino às reduções confirmadas', body: `Já confirmaste ${money(action.confirmedAnnualCents)} por ano. Não representa dinheiro já depositado.`, why: 'Existe uma redução real, mas ainda não está ligada a um objetivo.', href: '/savings-goal', cta: 'Definir objetivo' }

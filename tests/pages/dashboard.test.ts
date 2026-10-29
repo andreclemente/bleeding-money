@@ -55,6 +55,17 @@ describe('Hoje', () => {
     expect(page).toContain('?edit=agenda')
   })
 
+  it('leva uma estimativa prioritária diretamente para a sala de decisão do contrato', async () => {
+    const page = await readFile(new URL('../../pages/dashboard.vue', import.meta.url), 'utf8')
+    const detail = await readFile(new URL('../../pages/expenses/[id].vue', import.meta.url), 'utf8')
+
+    expect(page).toContain("action.kind === 'estimated_finding'")
+    expect(page).toContain('`/expenses/${action.expenseId}#decision-room`')
+    expect(page).toContain("cta: 'Preparar contrato'")
+    expect(detail).toContain('id="decision-room"')
+    expect(detail).toMatch(/Sala de decisão do contrato/i)
+  })
+
   it('mostra o contrato e o custo anterior para tornar cada confirmação auditável', async () => {
     const page = await readFile(new URL('../../pages/dashboard.vue', import.meta.url), 'utf8')
 

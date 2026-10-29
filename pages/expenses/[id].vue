@@ -640,11 +640,12 @@ const saveAgenda = async () => {
           </aside>
 
           <aside
+            id="decision-room"
             class="panel decision-dates"
             aria-labelledby="decision-dates-heading"
           >
             <div class="section-kicker">
-              Agenda contratual
+              Sala de decisão do contrato
             </div>
             <h2 id="decision-dates-heading">
               Datas para decidir
